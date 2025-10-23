@@ -1,6 +1,7 @@
 import React, { ReactNode } from 'react';
-import { View, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { colors } from '../theme';
 
 interface ScreenProps {
@@ -14,22 +15,24 @@ export default function Screen({
   scroll = false,
   edges = ['top', 'bottom']
 }: ScreenProps) {
-  const content = (
+  const content = scroll ? (
+    <KeyboardAwareScrollView
+      style={styles.scroll}
+      contentContainerStyle={styles.scrollContent}
+      showsVerticalScrollIndicator={false}
+      enableOnAndroid={true}
+      extraScrollHeight={20}
+      keyboardShouldPersistTaps="handled"
+      enableAutomaticScroll={true}
+    >
+      {children}
+    </KeyboardAwareScrollView>
+  ) : (
     <KeyboardAvoidingView
       style={styles.keyboardAvoid}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      {scroll ? (
-        <ScrollView
-          style={styles.scroll}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          {children}
-        </ScrollView>
-      ) : (
-        <View style={styles.container}>{children}</View>
-      )}
+      <View style={styles.container}>{children}</View>
     </KeyboardAvoidingView>
   );
 

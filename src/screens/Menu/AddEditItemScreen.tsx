@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { Text, TextInput, Button, SegmentedButtons } from 'react-native-paper';
 import { RouteProp, useRoute, useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -83,12 +83,11 @@ export default function AddEditItemScreen() {
   }
 
   return (
-    <Screen>
-      <ScrollView style={styles.container}>
-        <View style={styles.form}>
-          <Text variant="headlineSmall" style={styles.title}>
-            Add Menu Item
-          </Text>
+    <Screen scroll>
+      <View style={styles.form}>
+        <Text variant="headlineSmall" style={styles.title}>
+          Add Menu Item
+        </Text>
 
           {/* Item Name */}
           <TextInput
@@ -182,25 +181,24 @@ export default function AddEditItemScreen() {
             />
           </View>
 
-          <View style={styles.buttonContainer}>
-            <Button
-              mode="outlined"
-              onPress={() => navigation.goBack()}
-              style={styles.button}
-            >
-              Cancel
-            </Button>
-            <Button
-              mode="contained"
-              onPress={handleSave}
-              style={styles.button}
-              disabled={loading}
-            >
-              Add Item
-            </Button>
-          </View>
+        <View style={styles.buttonContainer}>
+          <Button
+            mode="outlined"
+            onPress={() => navigation.goBack()}
+            style={styles.button}
+          >
+            Cancel
+          </Button>
+          <Button
+            mode="contained"
+            onPress={handleSave}
+            style={styles.button}
+            disabled={loading}
+          >
+            Add Item
+          </Button>
         </View>
-      </ScrollView>
+      </View>
     </Screen>
   );
 }
