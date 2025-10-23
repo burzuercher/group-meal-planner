@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, FlatList, RefreshControl } from 'react-native';
 import { Text, Card, FAB, Chip } from 'react-native-paper';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Screen, EmptyState, Loading } from '../../components';
@@ -109,10 +110,10 @@ export default function WeekMenuScreen() {
   const { start, end } = getCurrentWeekRange();
 
   return (
-    <Screen edges={['bottom']}>
+    <Screen>
       <View style={styles.container}>
         <View style={styles.header}>
-          <Text variant="titleMedium" style={styles.headerTitle}>
+          <Text variant="displaySmall" style={styles.headerTitle}>
             This Week
           </Text>
           <Text variant="bodyMedium" style={styles.headerSubtitle}>
@@ -162,14 +163,31 @@ interface WeekMenuCardProps {
 }
 
 function WeekMenuCard({ menu, onPress }: WeekMenuCardProps) {
+  const isActive = menu.status === 'active';
+  const statusColor = isActive ? colors.menuActive : colors.menuProposed;
+
   return (
-    <Card style={styles.card} onPress={onPress}>
+    <Card
+      style={[
+        styles.card,
+        {
+          borderLeftWidth: 2,
+          borderLeftColor: statusColor,
+        }
+      ]}
+      onPress={onPress}
+    >
       <Card.Content>
         <View style={styles.cardHeader}>
           <View style={styles.cardTitleContainer}>
-            <Text variant="titleMedium" style={styles.cardTitle}>
-              {formatDate(menu.date, 'EEEE, MMM d')}
-            </Text>
+            <View style={styles.titleSection}>
+              <Text variant="titleLarge" style={styles.menuName}>
+                {menu.name}
+              </Text>
+              <Text variant="bodyMedium" style={styles.cardTitle}>
+                {formatDate(menu.date, 'EEEE, MMM d')}
+              </Text>
+            </View>
             <Chip
               style={[
                 styles.statusChip,
@@ -199,6 +217,12 @@ function WeekMenuCard({ menu, onPress }: WeekMenuCardProps) {
 
         <View style={styles.stats}>
           <View style={styles.stat}>
+            <MaterialCommunityIcons
+              name="food"
+              size={20}
+              color={colors.text.secondary}
+              style={styles.statIcon}
+            />
             <Text variant="labelLarge" style={styles.statValue}>
               {menu.items.length}
             </Text>
@@ -207,6 +231,12 @@ function WeekMenuCard({ menu, onPress }: WeekMenuCardProps) {
             </Text>
           </View>
           <View style={styles.stat}>
+            <MaterialCommunityIcons
+              name="check-circle-outline"
+              size={20}
+              color={colors.available}
+              style={styles.statIcon}
+            />
             <Text
               variant="labelLarge"
               style={[styles.statValue, { color: colors.available }]}
@@ -218,6 +248,12 @@ function WeekMenuCard({ menu, onPress }: WeekMenuCardProps) {
             </Text>
           </View>
           <View style={styles.stat}>
+            <MaterialCommunityIcons
+              name="account"
+              size={20}
+              color={colors.myReserved}
+              style={styles.statIcon}
+            />
             <Text
               variant="labelLarge"
               style={[styles.statValue, { color: colors.myReserved }]}
@@ -229,6 +265,19 @@ function WeekMenuCard({ menu, onPress }: WeekMenuCardProps) {
             </Text>
           </View>
         </View>
+
+        {isActive && menu.attendees.length > 0 && (
+          <View style={styles.attendanceRow}>
+            <MaterialCommunityIcons
+              name="account-group"
+              size={16}
+              color={colors.text.secondary}
+            />
+            <Text variant="bodySmall" style={styles.attendanceText}>
+              {menu.attendees.length} attending
+            </Text>
+          </View>
+        )}
 
         {menu.items.length > 0 && (
           <View style={styles.itemPreview}>
@@ -267,18 +316,24 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    padding: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.xl,
+    paddingBottom: spacing.lg,
     backgroundColor: colors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: '#f0f0f0',
   },
   headerTitle: {
-    fontWeight: '600',
+    fontWeight: '700',
+    fontSize: 32,
     color: colors.text.primary,
+    marginBottom: spacing.xs,
+    letterSpacing: -0.5,
   },
   headerSubtitle: {
     color: colors.text.secondary,
-    marginTop: spacing.xs,
+    fontSize: 13,
+    fontWeight: '400',
   },
   list: {
     padding: spacing.md,
@@ -287,6 +342,7 @@ const styles = StyleSheet.create({
   card: {
     marginBottom: spacing.md,
     borderRadius: borderRadius.lg,
+    backgroundColor: colors.surface,
     ...elevation.level1,
   },
   cardHeader: {
@@ -295,29 +351,47 @@ const styles = StyleSheet.create({
   cardTitleContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
+  },
+  titleSection: {
+    flex: 1,
+    marginRight: spacing.sm,
+  },
+  menuName: {
+    fontWeight: '700',
+    fontSize: 20,
+    color: colors.text.primary,
+    marginBottom: spacing.xs,
+    letterSpacing: -0.3,
   },
   cardTitle: {
-    fontWeight: '600',
-    flex: 1,
+    fontWeight: '400',
+    fontSize: 14,
+    color: colors.text.secondary,
   },
   statusChip: {
     marginLeft: spacing.sm,
   },
   proposedBy: {
     color: colors.text.secondary,
+    fontSize: 12,
     marginBottom: spacing.md,
   },
   stats: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    paddingVertical: spacing.md,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.md,
+    marginTop: spacing.md,
     borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: colors.border,
+    borderTopColor: '#f5f5f5',
   },
   stat: {
     alignItems: 'center',
+    flex: 1,
+  },
+  statIcon: {
+    marginBottom: spacing.xs,
   },
   statValue: {
     fontWeight: '700',
@@ -327,10 +401,27 @@ const styles = StyleSheet.create({
   statLabel: {
     color: colors.text.secondary,
     marginTop: spacing.xs,
+    fontSize: 11,
+    textAlign: 'center',
+  },
+  attendanceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginTop: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  attendanceText: {
+    color: colors.text.secondary,
+    fontSize: 12,
+    fontWeight: '500',
   },
   itemPreview: {
     marginTop: spacing.md,
+    paddingTop: spacing.md,
     gap: spacing.xs,
+    borderTopWidth: 1,
+    borderTopColor: '#f5f5f5',
   },
   itemPreviewRow: {
     flexDirection: 'row',
