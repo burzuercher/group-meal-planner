@@ -50,7 +50,7 @@ export default function CalendarScreen() {
     }
   };
 
-  const updateMarkedDates = (menuList: Menu[]) => {
+  const updateMarkedDates = (menuList: Menu[], newSelectedDate?: string) => {
     const marked: any = {};
 
     // Mark all menu dates
@@ -62,10 +62,11 @@ export default function CalendarScreen() {
       };
     });
 
-    // Highlight selected date
-    if (selectedDate) {
-      marked[selectedDate] = {
-        ...marked[selectedDate],
+    // Highlight selected date (use parameter if provided, otherwise use state)
+    const dateToHighlight = newSelectedDate !== undefined ? newSelectedDate : selectedDate;
+    if (dateToHighlight) {
+      marked[dateToHighlight] = {
+        ...marked[dateToHighlight],
         selected: true,
         selectedColor: colors.primary,
       };
@@ -76,20 +77,7 @@ export default function CalendarScreen() {
 
   const handleDayPress = (day: DateData) => {
     setSelectedDate(day.dateString);
-    updateMarkedDates(menus);
-
-    // Find menu for this date
-    const menuForDate = menus.find(
-      (menu) => formatDateKey(menu.date) === day.dateString
-    );
-
-    if (menuForDate) {
-      // Navigate to menu details
-      navigation.navigate('MenuDetails', {
-        menuId: menuForDate.id,
-        dateString: day.dateString,
-      });
-    }
+    updateMarkedDates(menus, day.dateString);
   };
 
   const handleMonthChange = (date: DateData) => {

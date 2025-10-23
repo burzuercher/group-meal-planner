@@ -87,6 +87,13 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (profileStr) {
         const profile = JSON.parse(profileStr);
         set({ userProfile: profile });
+
+        // Auto-select single group if no current group is set
+        if (!currentGroupStr && profile.joinedGroups?.length === 1) {
+          const singleGroupId = profile.joinedGroups[0].groupId;
+          await AsyncStorage.setItem(CURRENT_GROUP_KEY, singleGroupId);
+          set({ currentGroupId: singleGroupId });
+        }
       }
 
       if (currentGroupStr) {
