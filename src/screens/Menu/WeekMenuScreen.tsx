@@ -92,7 +92,7 @@ export default function WeekMenuScreen() {
 
   if (!currentGroupId) {
     return (
-      <Screen>
+      <Screen edges={['bottom']}>
         <EmptyState
           icon="account-group-outline"
           title="No Group Selected"
@@ -109,7 +109,7 @@ export default function WeekMenuScreen() {
   const { start, end } = getCurrentWeekRange();
 
   return (
-    <Screen>
+    <Screen edges={['bottom']}>
       <View style={styles.container}>
         <View style={styles.header}>
           <Text variant="titleMedium" style={styles.headerTitle}>

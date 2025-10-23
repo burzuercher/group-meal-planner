@@ -5,7 +5,7 @@ import { spacing } from '../../theme';
 
 export default function ShoppingListScreen() {
   return (
-    <Screen>
+    <Screen edges={['bottom']}>
       <EmptyState
         icon="cart"
         title="Shopping List"

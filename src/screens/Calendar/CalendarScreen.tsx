@@ -109,7 +109,7 @@ export default function CalendarScreen() {
 
   if (!currentGroupId) {
     return (
-      <Screen>
+      <Screen edges={['bottom']}>
         <EmptyState
           icon="account-group-outline"
           title="No Group Selected"
@@ -120,7 +120,7 @@ export default function CalendarScreen() {
   }
 
   return (
-    <Screen>
+    <Screen edges={['bottom']}>
       <ScrollView
         style={styles.container}
         refreshControl={

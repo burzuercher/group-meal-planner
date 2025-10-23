@@ -198,7 +198,7 @@ export default function GroupsScreen() {
   }
 
   return (
-    <Screen>
+    <Screen edges={['bottom']}>
       <View style={styles.container}>
         <View style={styles.header}>
           <View>

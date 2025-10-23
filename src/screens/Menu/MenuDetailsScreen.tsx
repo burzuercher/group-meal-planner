@@ -191,7 +191,7 @@ export default function MenuDetailsScreen() {
 
   if (!menu) {
     return (
-      <Screen>
+      <Screen edges={['bottom']}>
         <EmptyState
           icon="food-off"
           title="Menu Not Found"
@@ -206,7 +206,7 @@ export default function MenuDetailsScreen() {
   const filteredItems = getFilteredItems();
 
   return (
-    <Screen>
+    <Screen edges={['bottom']}>
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>

@@ -89,7 +89,7 @@ export default function AddEditItemScreen() {
   }
 
   return (
-    <Screen scroll>
+    <Screen scroll edges={['bottom']}>
       <View style={styles.form}>
         <Text variant="headlineSmall" style={styles.title}>
           Add Menu Item

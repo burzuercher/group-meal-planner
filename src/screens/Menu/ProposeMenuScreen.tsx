@@ -89,7 +89,7 @@ export default function ProposeMenuScreen() {
   }
 
   return (
-    <Screen scroll>
+    <Screen scroll edges={['bottom']}>
       <View style={styles.container}>
         <View style={styles.content}>
           <Text variant="headlineMedium" style={styles.title}>
