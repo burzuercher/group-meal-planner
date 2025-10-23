@@ -12,9 +12,31 @@ import {
   orderBy,
 } from 'firebase/firestore';
 import { db } from './firebase';
-import { Menu, MenuItem } from '../types';
+import { Menu, MenuItem, MenuAttendee } from '../types';
 import { startOfDay, endOfDay } from 'date-fns';
 import { getGroupById } from './groupService';
+
+/**
+ * Helper: Migrates old string[] attendees to MenuAttendee[]
+ * For backward compatibility with existing data
+ */
+function migrateAttendees(attendees: any): MenuAttendee[] {
+  if (!attendees || attendees.length === 0) {
+    return [];
+  }
+
+  // Check if already in new format
+  if (typeof attendees[0] === 'object' && 'name' in attendees[0]) {
+    return attendees as MenuAttendee[];
+  }
+
+  // Migrate old string[] format
+  return (attendees as string[]).map((name) => ({
+    name,
+    adults: 1,
+    children: 0,
+  }));
+}
 
 /**
  * Creates a new menu for a specific date
@@ -76,7 +98,7 @@ export async function getMenuById(
       date: data.date.toDate(),
       proposedBy: data.proposedBy,
       status: data.status,
-      attendees: data.attendees || [],
+      attendees: migrateAttendees(data.attendees || []),
       createdAt: data.createdAt.toDate(),
     };
   } catch (error) {
@@ -112,7 +134,7 @@ export async function getMenusInRange(
         date: data.date.toDate(),
         proposedBy: data.proposedBy,
         status: data.status,
-        attendees: data.attendees || [],
+        attendees: migrateAttendees(data.attendees || []),
         createdAt: data.createdAt.toDate(),
       };
     });
@@ -156,7 +178,7 @@ export async function getMenuByDate(
       date: data.date.toDate(),
       proposedBy: data.proposedBy,
       status: data.status,
-      attendees: data.attendees || [],
+      attendees: migrateAttendees(data.attendees || []),
       createdAt: data.createdAt.toDate(),
     };
   } catch (error) {
@@ -194,7 +216,7 @@ export async function updateMenu(
 
 /**
  * Updates menu status
- * When changing to 'active', automatically marks all group members as attending
+ * When changing to 'active', automatically marks all group members as attending with their full party sizes
  */
 export async function updateMenuStatus(
   groupId: string,
@@ -205,11 +227,16 @@ export async function updateMenuStatus(
     const menuRef = doc(db, `groups/${groupId}/menus`, menuId);
     const updateData: any = { status };
 
-    // When activating a menu, auto-populate attendees with all group members
+    // When activating a menu, auto-populate attendees with all group members and their full party sizes
     if (status === 'active') {
       const group = await getGroupById(groupId);
       if (group) {
-        updateData.attendees = group.members;
+        updateData.attendees = group.members.map((member) => ({
+          name: member.name,
+          adults: member.partySize.adults,
+          children: member.partySize.children,
+          profileImageUri: member.profileImageUri,
+        }));
       }
     }
 
@@ -241,14 +268,16 @@ export async function deleteMenu(groupId: string, menuId: string): Promise<void>
 }
 
 /**
- * Toggles attendance for a user
- * Adds user to attendees if not present, removes if present
+ * Updates attendance for the current user
+ * Allows user to specify how many adults and children from their party are attending
  */
-export async function toggleAttendance(
+export async function updateMyAttendance(
   groupId: string,
   menuId: string,
   userName: string,
-  isAttending: boolean
+  adults: number,
+  children: number,
+  profileImageUri?: string
 ): Promise<void> {
   try {
     const menuRef = doc(db, `groups/${groupId}/menus`, menuId);
@@ -258,26 +287,58 @@ export async function toggleAttendance(
       throw new Error('Menu not found');
     }
 
-    const currentAttendees = menuDoc.data().attendees || [];
+    const currentAttendees = migrateAttendees(menuDoc.data().attendees || []);
 
-    let newAttendees: string[];
-    if (isAttending) {
-      // Add to attendees if not already present
-      if (!currentAttendees.includes(userName)) {
-        newAttendees = [...currentAttendees, userName];
-      } else {
-        newAttendees = currentAttendees;
-      }
+    // Remove user if both adults and children are 0 (not attending)
+    if (adults === 0 && children === 0) {
+      const newAttendees = currentAttendees.filter(
+        (attendee) => attendee.name !== userName
+      );
+      await updateDoc(menuRef, { attendees: newAttendees });
+      return;
+    }
+
+    // Find if user is already in attendees
+    const existingIndex = currentAttendees.findIndex(
+      (attendee) => attendee.name === userName
+    );
+
+    const newAttendeeData: MenuAttendee = {
+      name: userName,
+      adults,
+      children,
+      ...(profileImageUri && { profileImageUri }),
+    };
+
+    let newAttendees: MenuAttendee[];
+    if (existingIndex >= 0) {
+      // Update existing attendance
+      newAttendees = [...currentAttendees];
+      newAttendees[existingIndex] = newAttendeeData;
     } else {
-      // Remove from attendees
-      newAttendees = currentAttendees.filter((name: string) => name !== userName);
+      // Add new attendance
+      newAttendees = [...currentAttendees, newAttendeeData];
     }
 
     await updateDoc(menuRef, { attendees: newAttendees });
   } catch (error) {
-    console.error('Error toggling attendance:', error);
+    console.error('Error updating attendance:', error);
     throw new Error('Failed to update attendance');
   }
+}
+
+/**
+ * DEPRECATED: Use updateMyAttendance instead
+ * Kept for backward compatibility during migration
+ */
+export async function toggleAttendance(
+  groupId: string,
+  menuId: string,
+  userName: string,
+  isAttending: boolean
+): Promise<void> {
+  // Forward to new function with default party size
+  await updateMyAttendance(groupId, menuId, userName, isAttending ? 1 : 0, 0);
 }
 
 // ============================================================================

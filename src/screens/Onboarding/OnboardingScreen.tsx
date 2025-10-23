@@ -1,17 +1,23 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, Image } from 'react-native';
-import { Text, Button, TextInput, SegmentedButtons } from 'react-native-paper';
-import { Screen, Loading } from '../../components';
-import { colors, spacing, borderRadius } from '../../theme';
+import { View, StyleSheet, Image, TouchableOpacity, Alert } from 'react-native';
+import { Text, Button, TextInput, SegmentedButtons, IconButton } from 'react-native-paper';
+import * as ImagePicker from 'expo-image-picker';
+import { Screen, Loading, PartySizeInput, Avatar } from '../../components';
+import { colors, spacing, borderRadius, elevation } from '../../theme';
 import { useAppStore } from '../../store';
 import { createGroup, joinGroup } from '../../services/groupService';
+import { uploadProfileImage } from '../../services/storageService';
+import { GroupMember } from '../../types';
 
-type OnboardingStep = 'welcome' | 'name' | 'group';
+type OnboardingStep = 'welcome' | 'name' | 'profile' | 'group';
 type GroupMode = 'create' | 'join';
 
 export default function OnboardingScreen() {
   const [step, setStep] = useState<OnboardingStep>('welcome');
   const [name, setName] = useState('');
+  const [profileImageUri, setProfileImageUri] = useState<string | undefined>();
+  const [adults, setAdults] = useState(1);
+  const [children, setChildren] = useState(0);
   const [groupMode, setGroupMode] = useState<GroupMode>('create');
   const [groupName, setGroupName] = useState('');
   const [groupCode, setGroupCode] = useState('');
@@ -23,6 +29,40 @@ export default function OnboardingScreen() {
   const handleNameNext = () => {
     if (name.trim().length < 2) {
       setError('Please enter your name (at least 2 characters)');
+      return;
+    }
+    setError('');
+    setStep('profile');
+  };
+
+  const handlePickImage = async () => {
+    try {
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+      if (!permissionResult.granted) {
+        Alert.alert('Permission required', 'Please allow access to your photos to set a profile image.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.7,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setProfileImageUri(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      Alert.alert('Error', 'Failed to pick image. Please try again.');
+    }
+  };
+
+  const handleProfileNext = () => {
+    if (adults < 1) {
+      setError('You must have at least 1 adult');
       return;
     }
     setError('');
@@ -39,11 +79,33 @@ export default function OnboardingScreen() {
     setError('');
 
     try {
-      const { group, code } = await createGroup(groupName.trim(), name.trim());
+      // Upload profile image if provided (optional - continues without if it fails)
+      let uploadedImageUri: string | undefined;
+      if (profileImageUri) {
+        try {
+          const userId = `${name.trim()}_${Date.now()}`;
+          uploadedImageUri = await uploadProfileImage(userId, profileImageUri);
+        } catch (uploadError) {
+          console.warn('Failed to upload profile image, continuing without it:', uploadError);
+          // Continue without profile image - it's optional
+        }
+      }
 
-      // Save user profile
+      // Create group member object (only include profileImageUri if it exists)
+      const memberData: GroupMember = {
+        name: name.trim(),
+        ...(uploadedImageUri && { profileImageUri: uploadedImageUri }),
+        partySize: { adults, children },
+        joinedAt: new Date(),
+      } as GroupMember;
+
+      const { group, code } = await createGroup(groupName.trim(), memberData);
+
+      // Save user profile (only include profileImageUri if it exists)
       await setUserProfile({
         name: name.trim(),
+        ...(uploadedImageUri && { profileImageUri: uploadedImageUri }),
+        partySize: { adults, children },
         joinedGroups: [
           {
             groupId: group.id,
@@ -72,11 +134,33 @@ export default function OnboardingScreen() {
     setError('');
 
     try {
-      const group = await joinGroup(groupCode.trim().toUpperCase(), name.trim());
+      // Upload profile image if provided (optional - continues without if it fails)
+      let uploadedImageUri: string | undefined;
+      if (profileImageUri) {
+        try {
+          const userId = `${name.trim()}_${Date.now()}`;
+          uploadedImageUri = await uploadProfileImage(userId, profileImageUri);
+        } catch (uploadError) {
+          console.warn('Failed to upload profile image, continuing without it:', uploadError);
+          // Continue without profile image - it's optional
+        }
+      }
 
-      // Save user profile
+      // Create group member object (only include profileImageUri if it exists)
+      const memberData: GroupMember = {
+        name: name.trim(),
+        ...(uploadedImageUri && { profileImageUri: uploadedImageUri }),
+        partySize: { adults, children },
+        joinedAt: new Date(),
+      } as GroupMember;
+
+      const group = await joinGroup(groupCode.trim().toUpperCase(), memberData);
+
+      // Save user profile (only include profileImageUri if it exists)
       await setUserProfile({
         name: name.trim(),
+        ...(uploadedImageUri && { profileImageUri: uploadedImageUri }),
+        partySize: { adults, children },
         joinedGroups: [
           {
             groupId: group.id,
@@ -179,6 +263,92 @@ export default function OnboardingScreen() {
             <Button
               mode="contained"
               onPress={handleNameNext}
+              style={styles.buttonPrimary}
+              contentStyle={styles.buttonContent}
+            >
+              Next
+            </Button>
+          </View>
+        </View>
+      </Screen>
+    );
+  }
+
+  // Profile Step
+  if (step === 'profile') {
+    return (
+      <Screen scroll>
+        <View style={styles.container}>
+          <View style={styles.content}>
+            <Text variant="displayMedium" style={styles.title}>
+              Set Up Your Profile
+            </Text>
+            <Text variant="bodyMedium" style={styles.subtitle}>
+              Add a photo and tell us about your party size
+            </Text>
+
+            {/* Profile Image */}
+            <View style={styles.profileSection}>
+              <TouchableOpacity
+                onPress={handlePickImage}
+                style={styles.avatarContainer}
+              >
+                {profileImageUri ? (
+                  <Avatar
+                    imageUri={profileImageUri}
+                    name={name}
+                    size={100}
+                  />
+                ) : (
+                  <View style={styles.avatarPlaceholder}>
+                    <Avatar name={name} size={100} />
+                    <View style={styles.cameraIconContainer}>
+                      <IconButton
+                        icon="camera"
+                        size={20}
+                        iconColor={colors.text.onPrimary}
+                      />
+                    </View>
+                  </View>
+                )}
+              </TouchableOpacity>
+              <Text variant="bodySmall" style={styles.photoHint}>
+                Tap to {profileImageUri ? 'change' : 'add'} photo (optional)
+              </Text>
+            </View>
+
+            {/* Party Size */}
+            <View style={styles.partySizeSection}>
+              <Text variant="titleMedium" style={styles.sectionTitle}>
+                Default Party Size
+              </Text>
+              <Text variant="bodySmall" style={styles.sectionHint}>
+                How many people are typically in your group? You can adjust this for each meal.
+              </Text>
+              <View style={styles.partySizeContainer}>
+                <PartySizeInput
+                  adults={adults}
+                  children={children}
+                  onAdultsChange={setAdults}
+                  onChildrenChange={setChildren}
+                />
+              </View>
+            </View>
+
+            {error && <Text style={styles.errorText}>{error}</Text>}
+          </View>
+
+          <View style={styles.buttonContainer}>
+            <Button
+              mode="outlined"
+              onPress={() => setStep('name')}
+              style={styles.buttonSecondary}
+            >
+              Back
+            </Button>
+            <Button
+              mode="contained"
+              onPress={handleProfileNext}
               style={styles.buttonPrimary}
               contentStyle={styles.buttonContent}
             >
@@ -374,5 +544,51 @@ const styles = StyleSheet.create({
     color: colors.error,
     marginTop: spacing.sm,
     marginLeft: spacing.sm,
+  },
+  profileSection: {
+    alignItems: 'center',
+    marginTop: spacing.xl,
+    marginBottom: spacing.xl,
+  },
+  avatarContainer: {
+    marginBottom: spacing.sm,
+  },
+  avatarPlaceholder: {
+    position: 'relative',
+  },
+  cameraIconContainer: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    backgroundColor: colors.primary,
+    borderRadius: 20,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: colors.surface,
+  },
+  photoHint: {
+    color: colors.text.secondary,
+    textAlign: 'center',
+  },
+  partySizeSection: {
+    marginTop: spacing.lg,
+  },
+  sectionTitle: {
+    fontWeight: '600',
+    color: colors.text.primary,
+    marginBottom: spacing.xs,
+  },
+  sectionHint: {
+    color: colors.text.secondary,
+    marginBottom: spacing.lg,
+  },
+  partySizeContainer: {
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
+    ...elevation.level1,
   },
 });

@@ -1,6 +1,14 @@
+// Party Size
+export interface PartySize {
+  adults: number;
+  children: number;
+}
+
 // User Profile (stored locally)
 export interface UserProfile {
   name: string;
+  profileImageUri?: string; // Firebase Storage download URL
+  partySize: PartySize;
   joinedGroups: GroupMembership[];
 }
 
@@ -11,13 +19,29 @@ export interface GroupMembership {
   joinedAt: Date;
 }
 
+// Group Member
+export interface GroupMember {
+  name: string;
+  profileImageUri?: string;
+  partySize: PartySize;
+  joinedAt: Date;
+}
+
 // Group (Firestore)
 export interface Group {
   id: string;
   name: string;
   code: string; // Shareable code to join group
-  members: string[]; // Array of member names
+  members: GroupMember[]; // Array of member objects (was string[] for backward compatibility)
   createdAt: Date;
+}
+
+// Menu Attendee
+export interface MenuAttendee {
+  name: string;
+  adults: number;
+  children: number;
+  profileImageUri?: string;
 }
 
 // Menu (Firestore)
@@ -28,7 +52,7 @@ export interface Menu {
   date: Date; // The date of the meal
   proposedBy: string; // Name of person who proposed
   status: 'proposed' | 'active'; // proposed = pending, active = confirmed
-  attendees: string[]; // Array of member names who are attending (populated when status becomes active)
+  attendees: MenuAttendee[]; // Array of attendees with party size (was string[] for backward compatibility)
   createdAt: Date;
 }
 

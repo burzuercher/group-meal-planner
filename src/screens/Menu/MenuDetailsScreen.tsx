@@ -5,7 +5,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { RouteProp, useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { Screen, Loading, EmptyState, MenuItemCard } from '../../components';
+import { Screen, Loading, EmptyState, MenuItemCard, AttendanceEditor, Avatar } from '../../components';
 import { colors, spacing, borderRadius, elevation } from '../../theme';
 import { useAppStore } from '../../store';
 import {
@@ -15,11 +15,11 @@ import {
   toggleItemReservation,
   deleteMenu,
   deleteMenuItem,
-  toggleAttendance,
+  updateMyAttendance,
   updateMenu,
   getMenuByDate,
 } from '../../services/menuService';
-import { Menu as MenuType, MenuItem, RootStackParamList } from '../../types';
+import { Menu as MenuType, MenuItem, RootStackParamList, MenuAttendee } from '../../types';
 import { formatDate, parseDateKey, formatDateKey } from '../../utils/dateUtils';
 
 type MenuDetailsRouteProp = RouteProp<RootStackParamList, 'MenuDetails'>;
@@ -42,6 +42,10 @@ export default function MenuDetailsScreen() {
   const [editedMenuName, setEditedMenuName] = useState('');
   const [editedDate, setEditedDate] = useState(new Date());
   const [showEditDatePicker, setShowEditDatePicker] = useState(false);
+
+  // Attendance editor state
+  const [showAttendanceEditor, setShowAttendanceEditor] = useState(false);
+  const [savingAttendance, setSavingAttendance] = useState(false);
 
   const { menuId, dateString} = route.params;
   const date = parseDateKey(dateString);
@@ -239,30 +243,46 @@ export default function MenuDetailsScreen() {
     navigation.navigate('AddEditItem', { menuId });
   };
 
-  const handleToggleAttendance = async () => {
+  const handleSaveAttendance = async (adults: number, children: number) => {
     if (!currentGroupId || !userProfile || !menu) return;
 
-    const isCurrentlyAttending = menu.attendees.includes(userProfile.name);
-    const newAttendingStatus = !isCurrentlyAttending;
+    setSavingAttendance(true);
 
     try {
-      await toggleAttendance(
+      await updateMyAttendance(
         currentGroupId,
         menuId,
         userProfile.name,
-        newAttendingStatus
+        adults,
+        children,
+        userProfile.profileImageUri
       );
 
       // Update local state
+      const updatedAttendees = menu.attendees.filter(
+        (attendee) => attendee.name !== userProfile.name
+      );
+
+      if (adults > 0 || children > 0) {
+        updatedAttendees.push({
+          name: userProfile.name,
+          adults,
+          children,
+          profileImageUri: userProfile.profileImageUri,
+        });
+      }
+
       setMenu({
         ...menu,
-        attendees: newAttendingStatus
-          ? [...menu.attendees, userProfile.name]
-          : menu.attendees.filter((name) => name !== userProfile.name),
+        attendees: updatedAttendees,
       });
+
+      setShowAttendanceEditor(false);
     } catch (error) {
-      console.error('Error toggling attendance:', error);
+      console.error('Error updating attendance:', error);
       Alert.alert('Error', 'Failed to update attendance');
+    } finally {
+      setSavingAttendance(false);
     }
   };
 
@@ -387,43 +407,63 @@ export default function MenuDetailsScreen() {
                   color={colors.primary}
                 />
                 <Text variant="titleSmall" style={styles.attendanceTitle}>
-                  Attendance: {menu.attendees.length} attending
+                  Attendance: {menu.attendees.reduce((sum, a) => sum + a.adults + a.children, 0)} people
                 </Text>
               </View>
               <Button
                 mode={
-                  userProfile && menu.attendees.includes(userProfile.name)
+                  userProfile && menu.attendees.some(a => a.name === userProfile.name)
                     ? 'contained'
                     : 'outlined'
                 }
-                onPress={handleToggleAttendance}
+                onPress={() => setShowAttendanceEditor(!showAttendanceEditor)}
                 compact
                 style={styles.attendanceButton}
                 icon={
-                  userProfile && menu.attendees.includes(userProfile.name)
+                  userProfile && menu.attendees.some(a => a.name === userProfile.name)
                     ? 'check'
                     : 'close'
                 }
               >
-                {userProfile && menu.attendees.includes(userProfile.name)
+                {userProfile && menu.attendees.some(a => a.name === userProfile.name)
                   ? 'Attending'
                   : 'Not Attending'}
               </Button>
             </View>
+
+            {showAttendanceEditor && userProfile && (
+              <View style={styles.attendanceEditorContainer}>
+                <AttendanceEditor
+                  defaultPartySize={userProfile.partySize}
+                  currentAttendance={menu.attendees.find(a => a.name === userProfile.name)}
+                  onSave={handleSaveAttendance}
+                  onCancel={() => setShowAttendanceEditor(false)}
+                  loading={savingAttendance}
+                />
+              </View>
+            )}
+
             {menu.attendees.length > 0 && (
               <View style={styles.attendeesList}>
                 {menu.attendees.map((attendee, index) => (
-                  <Chip
-                    key={index}
-                    style={[
-                      styles.attendeeChip,
-                      attendee === userProfile?.name && styles.myAttendeeChip,
-                    ]}
-                    textStyle={styles.attendeeChipText}
-                    compact
-                  >
-                    {attendee === userProfile?.name ? 'You' : attendee}
-                  </Chip>
+                  <View key={index} style={styles.attendeeChipContainer}>
+                    <Avatar
+                      imageUri={attendee.profileImageUri}
+                      name={attendee.name}
+                      size={32}
+                      style={styles.attendeeAvatar}
+                    />
+                    <Chip
+                      style={[
+                        styles.attendeeChip,
+                        attendee.name === userProfile?.name && styles.myAttendeeChip,
+                      ]}
+                      textStyle={styles.attendeeChipText}
+                      compact
+                    >
+                      {attendee.name === userProfile?.name ? 'You' : attendee.name} ({attendee.adults + attendee.children})
+                    </Chip>
+                  </View>
                 ))}
               </View>
             )}
@@ -641,11 +681,22 @@ const styles = StyleSheet.create({
   attendanceButton: {
     marginLeft: spacing.sm,
   },
+  attendanceEditorContainer: {
+    marginTop: spacing.md,
+  },
   attendeesList: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    gap: spacing.sm,
+    marginTop: spacing.md,
+  },
+  attendeeChipContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: spacing.xs,
-    marginTop: spacing.sm,
+  },
+  attendeeAvatar: {
+    marginRight: spacing.xs,
   },
   attendeeChip: {
     backgroundColor: colors.background,

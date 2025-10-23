@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { UserProfile, GroupMembership } from '../types';
+import { UserProfile, GroupMembership, PartySize } from '../types';
 
 interface AppState {
   // User data
@@ -9,6 +9,7 @@ interface AppState {
 
   // Actions
   setUserProfile: (profile: UserProfile) => Promise<void>;
+  updateProfileInfo: (updates: { profileImageUri?: string; partySize?: PartySize }) => Promise<void>;
   addGroup: (group: GroupMembership) => Promise<void>;
   setCurrentGroup: (groupId: string) => Promise<void>;
   removeGroup: (groupId: string) => Promise<void>;
@@ -29,6 +30,18 @@ export const useAppStore = create<AppState>((set, get) => ({
     } catch (error) {
       console.error('Error saving user profile:', error);
     }
+  },
+
+  updateProfileInfo: async (updates) => {
+    const currentProfile = get().userProfile;
+    if (!currentProfile) return;
+
+    const updatedProfile = {
+      ...currentProfile,
+      ...updates,
+    };
+
+    await get().setUserProfile(updatedProfile);
   },
 
   addGroup: async (group: GroupMembership) => {

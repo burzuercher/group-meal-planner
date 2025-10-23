@@ -9,7 +9,9 @@ import {
   Portal,
   TextInput,
   Chip,
+  Menu,
 } from 'react-native-paper';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Screen, EmptyState, Loading } from '../../components';
@@ -32,6 +34,7 @@ export default function GroupsScreen() {
   const [groupCode, setGroupCode] = useState('');
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState('');
+  const [menuVisible, setMenuVisible] = useState(false);
 
   useEffect(() => {
     loadGroups();
@@ -82,7 +85,15 @@ export default function GroupsScreen() {
     setError('');
 
     try {
-      const { group, code } = await createGroup(groupName.trim(), userProfile.name);
+      // Create group member object from user profile (only include profileImageUri if it exists)
+      const memberData = {
+        name: userProfile.name,
+        ...(userProfile.profileImageUri && { profileImageUri: userProfile.profileImageUri }),
+        partySize: userProfile.partySize,
+        joinedAt: new Date(),
+      };
+
+      const { group, code } = await createGroup(groupName.trim(), memberData);
 
       await addGroup({
         groupId: group.id,
@@ -127,7 +138,15 @@ export default function GroupsScreen() {
     setError('');
 
     try {
-      const group = await joinGroup(groupCode.trim().toUpperCase(), userProfile.name);
+      // Create group member object from user profile (only include profileImageUri if it exists)
+      const memberData = {
+        name: userProfile.name,
+        ...(userProfile.profileImageUri && { profileImageUri: userProfile.profileImageUri }),
+        partySize: userProfile.partySize,
+        joinedAt: new Date(),
+      };
+
+      const group = await joinGroup(groupCode.trim().toUpperCase(), memberData);
 
       await addGroup({
         groupId: group.id,
@@ -182,6 +201,30 @@ export default function GroupsScreen() {
     );
   };
 
+  const handleClearData = () => {
+    Alert.alert(
+      'Clear All Data',
+      'This will clear your profile and all local data. You will need to go through onboarding again.\n\nNote: This only clears LOCAL data. Firebase data will remain.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Clear Data',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await AsyncStorage.clear();
+              // Force reload by clearing state
+              window.location.reload();
+            } catch (error) {
+              console.error('Error clearing data:', error);
+              Alert.alert('Error', 'Failed to clear data');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const openDialog = (mode: 'create' | 'join') => {
     setDialogMode(mode);
     setError('');
@@ -207,13 +250,35 @@ export default function GroupsScreen() {
           end={gradients.header.end}
           style={styles.header}
         >
-          <View>
-            <Text variant="bodyMedium" style={styles.greeting}>
-              Signed in as
-            </Text>
-            <Text variant="titleLarge" style={styles.userName}>
-              {userProfile.name}
-            </Text>
+          <View style={styles.headerContent}>
+            <View>
+              <Text variant="bodyMedium" style={styles.greeting}>
+                Signed in as
+              </Text>
+              <Text variant="titleLarge" style={styles.userName}>
+                {userProfile.name}
+              </Text>
+            </View>
+            <Menu
+              visible={menuVisible}
+              onDismiss={() => setMenuVisible(false)}
+              anchor={
+                <IconButton
+                  icon="dots-vertical"
+                  size={24}
+                  onPress={() => setMenuVisible(true)}
+                />
+              }
+            >
+              <Menu.Item
+                onPress={() => {
+                  setMenuVisible(false);
+                  handleClearData();
+                }}
+                title="Clear Data (Dev)"
+                leadingIcon="delete-sweep"
+              />
+            </Menu>
           </View>
         </LinearGradient>
 
@@ -403,6 +468,11 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
     overflow: 'hidden',
+  },
+  headerContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   greeting: {
     color: colors.text.secondary,

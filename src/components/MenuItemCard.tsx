@@ -5,6 +5,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { MenuItem } from '../types';
 import { colors, spacing, borderRadius, elevation } from '../theme';
 import { useAppStore } from '../store';
+import Avatar from './Avatar';
 
 interface MenuItemCardProps {
   item: MenuItem;
@@ -98,12 +99,21 @@ export default function MenuItemCard({
           )}
 
           <View style={styles.footer}>
-            <Text
-              variant="bodySmall"
-              style={[styles.status, { color: getStatusColor() }]}
-            >
-              {getStatusText()}
-            </Text>
+            <View style={styles.statusContainer}>
+              {!isAvailable && item.reservedBy && (
+                <Avatar
+                  name={item.reservedBy}
+                  size={24}
+                  style={styles.statusAvatar}
+                />
+              )}
+              <Text
+                variant="bodySmall"
+                style={[styles.status, { color: getStatusColor() }]}
+              >
+                {getStatusText()}
+              </Text>
+            </View>
             {onReserve && (
               <TouchableOpacity
                 onPress={onReserve}
@@ -192,9 +202,19 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.border,
   },
+  statusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    flex: 1,
+  },
+  statusAvatar: {
+    marginRight: spacing.xs,
+  },
   status: {
     fontWeight: '500',
     fontSize: 13,
+    flex: 1,
   },
   reserveButton: {
     paddingHorizontal: spacing.md,
