@@ -189,4 +189,23 @@ export const elevation = {
   },
 };
 
+// Gradient configurations for modern backgrounds
+export const gradients = {
+  header: {
+    colors: ['#e8f5e9', '#f1f8f4', '#ffffff'] as const,
+    start: { x: 0, y: 0 },
+    end: { x: 1, y: 1 },
+  },
+  headerAlt: {
+    colors: ['#c8e6c9', '#e8f5e9', '#ffffff'] as const,
+    start: { x: 0, y: 0 },
+    end: { x: 1, y: 1 },
+  },
+  subtle: {
+    colors: ['#ffffff', '#f5f5f5'] as const,
+    start: { x: 0, y: 0 },
+    end: { x: 0, y: 1 },
+  },
+};
+
 export default theme;

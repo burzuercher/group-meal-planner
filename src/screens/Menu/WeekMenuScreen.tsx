@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, FlatList, RefreshControl } from 'react-native';
 import { Text, Card, FAB, Chip } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Screen, EmptyState, Loading } from '../../components';
-import { colors, spacing, borderRadius, elevation } from '../../theme';
+import { colors, spacing, borderRadius, elevation, gradients } from '../../theme';
 import { useAppStore } from '../../store';
 import { getMenusInRange, getMenuItems } from '../../services/menuService';
 import { Menu, MenuItem, RootStackParamList } from '../../types';
@@ -112,14 +113,19 @@ export default function WeekMenuScreen() {
   return (
     <Screen>
       <View style={styles.container}>
-        <View style={styles.header}>
+        <LinearGradient
+          colors={gradients.header.colors}
+          start={gradients.header.start}
+          end={gradients.header.end}
+          style={styles.header}
+        >
           <Text variant="displaySmall" style={styles.headerTitle}>
             This Week
           </Text>
           <Text variant="bodyMedium" style={styles.headerSubtitle}>
             {formatDate(start, 'MMM d')} - {formatDate(end, 'MMM d, yyyy')}
           </Text>
-        </View>
+        </LinearGradient>
 
         {menus.length === 0 ? (
           <EmptyState
@@ -137,6 +143,7 @@ export default function WeekMenuScreen() {
               <WeekMenuCard
                 menu={item}
                 onPress={() => handleMenuPress(item)}
+                userProfile={userProfile}
               />
             )}
             contentContainerStyle={styles.list}
@@ -160,9 +167,10 @@ export default function WeekMenuScreen() {
 interface WeekMenuCardProps {
   menu: MenuWithItems;
   onPress: () => void;
+  userProfile: { name: string } | null;
 }
 
-function WeekMenuCard({ menu, onPress }: WeekMenuCardProps) {
+function WeekMenuCard({ menu, onPress, userProfile }: WeekMenuCardProps) {
   const isActive = menu.status === 'active';
   const statusColor = isActive ? colors.menuActive : colors.menuProposed;
 
@@ -281,23 +289,38 @@ function WeekMenuCard({ menu, onPress }: WeekMenuCardProps) {
 
         {menu.items.length > 0 && (
           <View style={styles.itemPreview}>
-            {menu.items.slice(0, 3).map((item, index) => (
-              <View key={item.id} style={styles.itemPreviewRow}>
-                <View
-                  style={[
-                    styles.itemDot,
-                    {
-                      backgroundColor: item.reservedBy
-                        ? colors.reserved
-                        : colors.available,
-                    },
-                  ]}
-                />
-                <Text variant="bodySmall" style={styles.itemPreviewText}>
-                  {item.name}
-                </Text>
-              </View>
-            ))}
+            {menu.items.slice(0, 3).map((item, index) => {
+              const isMyItem = item.reservedBy === userProfile?.name;
+              const isReserved = item.reservedBy !== null;
+
+              let iconName: 'check-circle-outline' | 'account' | 'account-outline';
+              let iconColor: string;
+
+              if (!isReserved) {
+                iconName = 'check-circle-outline';
+                iconColor = colors.available;
+              } else if (isMyItem) {
+                iconName = 'account';
+                iconColor = colors.myReserved;
+              } else {
+                iconName = 'account-outline';
+                iconColor = colors.reserved;
+              }
+
+              return (
+                <View key={item.id} style={styles.itemPreviewRow}>
+                  <MaterialCommunityIcons
+                    name={iconName}
+                    size={16}
+                    color={iconColor}
+                    style={styles.itemIcon}
+                  />
+                  <Text variant="bodySmall" style={styles.itemPreviewText}>
+                    {item.name}
+                  </Text>
+                </View>
+              );
+            })}
             {menu.items.length > 3 && (
               <Text variant="bodySmall" style={styles.moreItems}>
                 +{menu.items.length - 3} more item
@@ -319,9 +342,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.xl,
     paddingBottom: spacing.lg,
-    backgroundColor: colors.surface,
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
+    overflow: 'hidden',
   },
   headerTitle: {
     fontWeight: '700',
@@ -427,10 +450,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  itemDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+  itemIcon: {
     marginRight: spacing.sm,
   },
   itemPreviewText: {

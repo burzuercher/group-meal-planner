@@ -11,8 +11,9 @@ import {
   Chip,
 } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Screen, EmptyState, Loading } from '../../components';
-import { colors, spacing, borderRadius, elevation } from '../../theme';
+import { colors, spacing, borderRadius, elevation, gradients } from '../../theme';
 import { useAppStore } from '../../store';
 import { createGroup, joinGroup, getGroupById } from '../../services/groupService';
 import { Group, GroupMembership } from '../../types';
@@ -200,7 +201,12 @@ export default function GroupsScreen() {
   return (
     <Screen edges={['bottom']}>
       <View style={styles.container}>
-        <View style={styles.header}>
+        <LinearGradient
+          colors={gradients.header.colors}
+          start={gradients.header.start}
+          end={gradients.header.end}
+          style={styles.header}
+        >
           <View>
             <Text variant="bodyMedium" style={styles.greeting}>
               Signed in as
@@ -209,7 +215,7 @@ export default function GroupsScreen() {
               {userProfile.name}
             </Text>
           </View>
-        </View>
+        </LinearGradient>
 
         {groups.length === 0 ? (
           <EmptyState
@@ -394,9 +400,9 @@ const styles = StyleSheet.create({
   },
   header: {
     padding: spacing.lg,
-    backgroundColor: colors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: '#f0f0f0',
+    overflow: 'hidden',
   },
   greeting: {
     color: colors.text.secondary,

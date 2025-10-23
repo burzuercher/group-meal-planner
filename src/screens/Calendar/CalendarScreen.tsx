@@ -2,10 +2,11 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { View, StyleSheet, ScrollView, RefreshControl } from 'react-native';
 import { Text, FAB, Chip, ActivityIndicator } from 'react-native-paper';
 import { Calendar, DateData } from 'react-native-calendars';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Screen, EmptyState } from '../../components';
-import { colors, spacing, borderRadius, elevation } from '../../theme';
+import { colors, spacing, borderRadius, elevation, gradients } from '../../theme';
 import { useAppStore } from '../../store';
 import { getMenusInRange } from '../../services/menuService';
 import { Menu, RootStackParamList } from '../../types';
@@ -130,31 +131,37 @@ export default function CalendarScreen() {
           />
         }
       >
-        <Calendar
-          current={formatDateKey(currentMonth)}
-          onDayPress={handleDayPress}
-          onMonthChange={handleMonthChange}
-          markedDates={markedDates}
-          theme={{
-            backgroundColor: colors.background,
-            calendarBackground: colors.surface,
-            textSectionTitleColor: colors.text.secondary,
-            selectedDayBackgroundColor: colors.primary,
-            selectedDayTextColor: colors.text.onPrimary,
-            todayTextColor: colors.primary,
-            dayTextColor: colors.text.primary,
-            textDisabledColor: colors.text.disabled,
-            dotColor: colors.primary,
-            selectedDotColor: colors.text.onPrimary,
-            arrowColor: colors.primary,
-            monthTextColor: colors.text.primary,
-            textDayFontWeight: '400',
-            textMonthFontWeight: '600',
-            textDayHeaderFontWeight: '500',
-          }}
-        />
+        <LinearGradient
+          colors={gradients.header.colors}
+          start={gradients.header.start}
+          end={gradients.header.end}
+          style={styles.calendarContainer}
+        >
+          <Calendar
+            current={formatDateKey(currentMonth)}
+            onDayPress={handleDayPress}
+            onMonthChange={handleMonthChange}
+            markedDates={markedDates}
+            theme={{
+              backgroundColor: 'transparent',
+              calendarBackground: 'transparent',
+              textSectionTitleColor: colors.text.secondary,
+              selectedDayBackgroundColor: colors.primary,
+              selectedDayTextColor: colors.text.onPrimary,
+              todayTextColor: colors.primary,
+              dayTextColor: colors.text.primary,
+              textDisabledColor: colors.text.disabled,
+              dotColor: colors.primary,
+              selectedDotColor: colors.text.onPrimary,
+              arrowColor: colors.primary,
+              monthTextColor: colors.text.primary,
+              textDayFontWeight: '400',
+              textMonthFontWeight: '600',
+              textDayHeaderFontWeight: '500',
+            }}
+          />
 
-        <View style={styles.legend}>
+          <View style={styles.legend}>
           <View style={styles.legendItem}>
             <View style={[styles.legendDot, { backgroundColor: colors.menuActive }]} />
             <Text variant="bodySmall" style={styles.legendText}>
@@ -168,6 +175,7 @@ export default function CalendarScreen() {
             </Text>
           </View>
         </View>
+        </LinearGradient>
 
         {selectedDate && (
           <View style={styles.selectedDateCard}>
@@ -245,15 +253,17 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  calendarContainer: {
+    overflow: 'hidden',
+  },
   legend: {
     flexDirection: 'row',
     justifyContent: 'center',
     gap: spacing.lg,
     padding: spacing.md,
     paddingVertical: spacing.lg,
-    backgroundColor: colors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: '#f0f0f0',
   },
   legendItem: {
     flexDirection: 'row',
