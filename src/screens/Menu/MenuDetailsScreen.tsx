@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, FlatList, Alert } from 'react-native';
-import { Text, FAB, Chip, IconButton, Menu, Divider } from 'react-native-paper';
+import { Text, FAB, Chip, IconButton, Menu, Divider, Button } from 'react-native-paper';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { RouteProp, useRoute, useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Screen, Loading, EmptyState, MenuItemCard } from '../../components';
@@ -12,6 +13,7 @@ import {
   updateMenuStatus,
   toggleItemReservation,
   deleteMenu,
+  toggleAttendance,
 } from '../../services/menuService';
 import { Menu as MenuType, MenuItem, RootStackParamList } from '../../types';
 import { formatDate, parseDateKey } from '../../utils/dateUtils';
@@ -128,6 +130,33 @@ export default function MenuDetailsScreen() {
     navigation.navigate('AddEditItem', { menuId });
   };
 
+  const handleToggleAttendance = async () => {
+    if (!currentGroupId || !userProfile || !menu) return;
+
+    const isCurrentlyAttending = menu.attendees.includes(userProfile.name);
+    const newAttendingStatus = !isCurrentlyAttending;
+
+    try {
+      await toggleAttendance(
+        currentGroupId,
+        menuId,
+        userProfile.name,
+        newAttendingStatus
+      );
+
+      // Update local state
+      setMenu({
+        ...menu,
+        attendees: newAttendingStatus
+          ? [...menu.attendees, userProfile.name]
+          : menu.attendees.filter((name) => name !== userProfile.name),
+      });
+    } catch (error) {
+      console.error('Error toggling attendance:', error);
+      Alert.alert('Error', 'Failed to update attendance');
+    }
+  };
+
   const getFilteredItems = () => {
     switch (filter) {
       case 'available':
@@ -219,6 +248,60 @@ export default function MenuDetailsScreen() {
             </Menu>
           </View>
         </View>
+
+        {/* Attendance Section - Only show for active menus */}
+        {menu.status === 'active' && (
+          <View style={styles.attendanceSection}>
+            <View style={styles.attendanceHeader}>
+              <View style={styles.attendanceInfo}>
+                <MaterialCommunityIcons
+                  name="account-group"
+                  size={20}
+                  color={colors.primary}
+                />
+                <Text variant="titleSmall" style={styles.attendanceTitle}>
+                  Attendance: {menu.attendees.length} attending
+                </Text>
+              </View>
+              <Button
+                mode={
+                  userProfile && menu.attendees.includes(userProfile.name)
+                    ? 'contained'
+                    : 'outlined'
+                }
+                onPress={handleToggleAttendance}
+                compact
+                style={styles.attendanceButton}
+                icon={
+                  userProfile && menu.attendees.includes(userProfile.name)
+                    ? 'check'
+                    : 'close'
+                }
+              >
+                {userProfile && menu.attendees.includes(userProfile.name)
+                  ? 'Attending'
+                  : 'Not Attending'}
+              </Button>
+            </View>
+            {menu.attendees.length > 0 && (
+              <View style={styles.attendeesList}>
+                {menu.attendees.map((attendee, index) => (
+                  <Chip
+                    key={index}
+                    style={[
+                      styles.attendeeChip,
+                      attendee === userProfile?.name && styles.myAttendeeChip,
+                    ]}
+                    textStyle={styles.attendeeChipText}
+                    compact
+                  >
+                    {attendee === userProfile?.name ? 'You' : attendee}
+                  </Chip>
+                ))}
+              </View>
+            )}
+          </View>
+        )}
 
         {/* Filters */}
         <View style={styles.filters}>
@@ -321,6 +404,46 @@ const styles = StyleSheet.create({
   },
   statusChip: {
     marginRight: spacing.xs,
+  },
+  attendanceSection: {
+    padding: spacing.md,
+    backgroundColor: colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  attendanceHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  attendanceInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    flex: 1,
+  },
+  attendanceTitle: {
+    fontWeight: '600',
+    color: colors.text.primary,
+  },
+  attendanceButton: {
+    marginLeft: spacing.sm,
+  },
+  attendeesList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+    marginTop: spacing.sm,
+  },
+  attendeeChip: {
+    backgroundColor: colors.background,
+  },
+  myAttendeeChip: {
+    backgroundColor: colors.primaryContainer,
+  },
+  attendeeChipText: {
+    fontSize: 12,
   },
   filters: {
     flexDirection: 'row',

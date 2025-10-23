@@ -14,6 +14,7 @@ import {
 import { db } from './firebase';
 import { Menu, MenuItem } from '../types';
 import { startOfDay, endOfDay } from 'date-fns';
+import { getGroupById } from './groupService';
 
 /**
  * Creates a new menu for a specific date
@@ -32,6 +33,7 @@ export async function createMenu(
       date: startOfDay(date),
       proposedBy,
       status: 'proposed',
+      attendees: [],
       createdAt: new Date(),
     };
 
@@ -74,6 +76,7 @@ export async function getMenuById(
       date: data.date.toDate(),
       proposedBy: data.proposedBy,
       status: data.status,
+      attendees: data.attendees || [],
       createdAt: data.createdAt.toDate(),
     };
   } catch (error) {
@@ -109,6 +112,7 @@ export async function getMenusInRange(
         date: data.date.toDate(),
         proposedBy: data.proposedBy,
         status: data.status,
+        attendees: data.attendees || [],
         createdAt: data.createdAt.toDate(),
       };
     });
@@ -152,6 +156,7 @@ export async function getMenuByDate(
       date: data.date.toDate(),
       proposedBy: data.proposedBy,
       status: data.status,
+      attendees: data.attendees || [],
       createdAt: data.createdAt.toDate(),
     };
   } catch (error) {
@@ -162,6 +167,7 @@ export async function getMenuByDate(
 
 /**
  * Updates menu status
+ * When changing to 'active', automatically marks all group members as attending
  */
 export async function updateMenuStatus(
   groupId: string,
@@ -170,7 +176,17 @@ export async function updateMenuStatus(
 ): Promise<void> {
   try {
     const menuRef = doc(db, `groups/${groupId}/menus`, menuId);
-    await updateDoc(menuRef, { status });
+    const updateData: any = { status };
+
+    // When activating a menu, auto-populate attendees with all group members
+    if (status === 'active') {
+      const group = await getGroupById(groupId);
+      if (group) {
+        updateData.attendees = group.members;
+      }
+    }
+
+    await updateDoc(menuRef, updateData);
   } catch (error) {
     console.error('Error updating menu status:', error);
     throw new Error('Failed to update menu status');
@@ -194,6 +210,46 @@ export async function deleteMenu(groupId: string, menuId: string): Promise<void>
   } catch (error) {
     console.error('Error deleting menu:', error);
     throw new Error('Failed to delete menu');
+  }
+}
+
+/**
+ * Toggles attendance for a user
+ * Adds user to attendees if not present, removes if present
+ */
+export async function toggleAttendance(
+  groupId: string,
+  menuId: string,
+  userName: string,
+  isAttending: boolean
+): Promise<void> {
+  try {
+    const menuRef = doc(db, `groups/${groupId}/menus`, menuId);
+    const menuDoc = await getDoc(menuRef);
+
+    if (!menuDoc.exists()) {
+      throw new Error('Menu not found');
+    }
+
+    const currentAttendees = menuDoc.data().attendees || [];
+
+    let newAttendees: string[];
+    if (isAttending) {
+      // Add to attendees if not already present
+      if (!currentAttendees.includes(userName)) {
+        newAttendees = [...currentAttendees, userName];
+      } else {
+        newAttendees = currentAttendees;
+      }
+    } else {
+      // Remove from attendees
+      newAttendees = currentAttendees.filter((name: string) => name !== userName);
+    }
+
+    await updateDoc(menuRef, { attendees: newAttendees });
+  } catch (error) {
+    console.error('Error toggling attendance:', error);
+    throw new Error('Failed to update attendance');
   }
 }
 

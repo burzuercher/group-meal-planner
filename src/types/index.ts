@@ -28,6 +28,7 @@ export interface Menu {
   date: Date; // The date of the meal
   proposedBy: string; // Name of person who proposed
   status: 'proposed' | 'active'; // proposed = pending, active = confirmed
+  attendees: string[]; // Array of member names who are attending (populated when status becomes active)
   createdAt: Date;
 }
 
