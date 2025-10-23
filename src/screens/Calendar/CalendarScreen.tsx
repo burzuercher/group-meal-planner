@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, StyleSheet, ScrollView } from 'react-native';
+import { View, StyleSheet, ScrollView, RefreshControl } from 'react-native';
 import { Text, FAB, Chip, ActivityIndicator } from 'react-native-paper';
 import { Calendar, DateData } from 'react-native-calendars';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Screen, EmptyState } from '../../components';
 import { colors, spacing, borderRadius } from '../../theme';
@@ -24,18 +24,16 @@ export default function CalendarScreen() {
   const [menus, setMenus] = useState<Menu[]>([]);
   const [markedDates, setMarkedDates] = useState<any>({});
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
-  useEffect(() => {
-    if (currentGroupId) {
-      loadMenus();
-    }
-  }, [currentGroupId, currentMonth]);
-
-  const loadMenus = async () => {
+  const loadMenus = useCallback(async (isRefreshing = false) => {
     if (!currentGroupId) return;
 
-    setLoading(true);
+    if (!isRefreshing) {
+      setLoading(true);
+    }
+
     try {
       const start = startOfMonth(addMonths(currentMonth, -1));
       const end = endOfMonth(addMonths(currentMonth, 1));
@@ -46,8 +44,24 @@ export default function CalendarScreen() {
     } catch (error) {
       console.error('Error loading menus:', error);
     } finally {
-      setLoading(false);
+      if (!isRefreshing) {
+        setLoading(false);
+      }
     }
+  }, [currentGroupId, currentMonth]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (currentGroupId) {
+        loadMenus();
+      }
+    }, [currentGroupId, loadMenus])
+  );
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await loadMenus(true);
+    setRefreshing(false);
   };
 
   const updateMarkedDates = (menuList: Menu[], newSelectedDate?: string) => {
@@ -107,7 +121,15 @@ export default function CalendarScreen() {
 
   return (
     <Screen>
-      <ScrollView style={styles.container}>
+      <ScrollView
+        style={styles.container}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+          />
+        }
+      >
         <Calendar
           current={formatDateKey(currentMonth)}
           onDayPress={handleDayPress}

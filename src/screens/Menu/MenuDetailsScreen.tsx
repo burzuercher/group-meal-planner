@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, FlatList, Alert } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, StyleSheet, FlatList, Alert, RefreshControl } from 'react-native';
 import { Text, FAB, Chip, IconButton, Menu, Divider, Button } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { RouteProp, useRoute, useNavigation } from '@react-navigation/native';
+import { RouteProp, useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Screen, Loading, EmptyState, MenuItemCard } from '../../components';
 import { colors, spacing, borderRadius } from '../../theme';
@@ -29,20 +29,20 @@ export default function MenuDetailsScreen() {
   const [menu, setMenu] = useState<MenuType | null>(null);
   const [items, setItems] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [menuVisible, setMenuVisible] = useState(false);
   const [filter, setFilter] = useState<'all' | 'available' | 'mine'>('all');
 
   const { menuId, dateString } = route.params;
   const date = parseDateKey(dateString);
 
-  useEffect(() => {
-    loadMenuData();
-  }, [menuId]);
-
-  const loadMenuData = async () => {
+  const loadMenuData = useCallback(async (isRefreshing = false) => {
     if (!currentGroupId) return;
 
-    setLoading(true);
+    if (!isRefreshing) {
+      setLoading(true);
+    }
+
     try {
       const [menuData, itemsData] = await Promise.all([
         getMenuById(currentGroupId, menuId),
@@ -55,8 +55,22 @@ export default function MenuDetailsScreen() {
       console.error('Error loading menu:', error);
       Alert.alert('Error', 'Failed to load menu details');
     } finally {
-      setLoading(false);
+      if (!isRefreshing) {
+        setLoading(false);
+      }
     }
+  }, [currentGroupId, menuId]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadMenuData();
+    }, [loadMenuData])
+  );
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await loadMenuData(true);
+    setRefreshing(false);
   };
 
   const handleToggleReservation = async (item: MenuItem) => {
@@ -360,6 +374,12 @@ export default function MenuDetailsScreen() {
               />
             )}
             contentContainerStyle={styles.list}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={handleRefresh}
+              />
+            }
           />
         )}
       </View>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Text, TextInput, Button, SegmentedButtons } from 'react-native-paper';
 import { RouteProp, useRoute, useNavigation } from '@react-navigation/native';
@@ -27,6 +27,12 @@ export default function AddEditItemScreen() {
   const { currentGroupId, userProfile } = useAppStore();
 
   const { menuId } = route.params;
+
+  // Refs for keyboard navigation
+  const quantityRef = useRef<any>(null);
+  const dietaryInfoRef = useRef<any>(null);
+  const notesRef = useRef<any>(null);
+  const recipeRef = useRef<any>(null);
 
   const [name, setName] = useState('');
   const [category, setCategory] = useState<MenuItemCategory>('Main Dish');
@@ -101,6 +107,9 @@ export default function AddEditItemScreen() {
             placeholder="e.g., Pasta Salad, Apple Pie"
             style={styles.input}
             error={!!errors.name}
+            returnKeyType="next"
+            onSubmitEditing={() => quantityRef.current?.focus()}
+            blurOnSubmit={false}
           />
           {errors.name && <Text style={styles.errorText}>{errors.name}</Text>}
 
@@ -124,26 +133,35 @@ export default function AddEditItemScreen() {
 
           {/* Quantity */}
           <TextInput
+            ref={quantityRef}
             mode="outlined"
             label="Quantity/Servings (Optional)"
             value={quantity}
             onChangeText={setQuantity}
             placeholder="e.g., serves 8, 2 bottles"
             style={styles.input}
+            returnKeyType="next"
+            onSubmitEditing={() => dietaryInfoRef.current?.focus()}
+            blurOnSubmit={false}
           />
 
           {/* Dietary Info */}
           <TextInput
+            ref={dietaryInfoRef}
             mode="outlined"
             label="Dietary Info"
             value={dietaryInfo}
             onChangeText={setDietaryInfo}
             placeholder="e.g., vegetarian, gluten-free"
             style={styles.input}
+            returnKeyType="next"
+            onSubmitEditing={() => notesRef.current?.focus()}
+            blurOnSubmit={false}
           />
 
           {/* Notes */}
           <TextInput
+            ref={notesRef}
             mode="outlined"
             label="Notes"
             value={notes}
@@ -152,10 +170,14 @@ export default function AddEditItemScreen() {
             multiline
             numberOfLines={3}
             style={styles.input}
+            returnKeyType="next"
+            onSubmitEditing={() => recipeRef.current?.focus()}
+            blurOnSubmit={false}
           />
 
           {/* Recipe Link */}
           <TextInput
+            ref={recipeRef}
             mode="outlined"
             label="Recipe Link (Optional)"
             value={recipe}
@@ -163,6 +185,7 @@ export default function AddEditItemScreen() {
             placeholder="https://..."
             keyboardType="url"
             style={styles.input}
+            returnKeyType="done"
           />
 
           {/* Reserve Option */}
