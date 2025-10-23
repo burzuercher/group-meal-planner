@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, Alert } from 'react-native';
+import { View, StyleSheet, Alert, Platform, TouchableOpacity } from 'react-native';
 import { Text, Button, TextInput } from 'react-native-paper';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { RouteProp, useRoute, useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Screen, Loading } from '../../components';
@@ -18,12 +19,21 @@ export default function ProposeMenuScreen() {
   const navigation = useNavigation<ProposeMenuNavigationProp>();
   const { currentGroupId, userProfile } = useAppStore();
 
+  const { dateString } = route.params;
+  const initialDate = parseDateKey(dateString);
+
   const [menuName, setMenuName] = useState('');
+  const [selectedDate, setSelectedDate] = useState(initialDate);
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const { dateString } = route.params;
-  const date = parseDateKey(dateString);
+  const handleDateChange = (event: any, date?: Date) => {
+    setShowDatePicker(Platform.OS === 'ios');
+    if (date) {
+      setSelectedDate(date);
+    }
+  };
 
   const handleProposeMenu = async () => {
     if (!menuName.trim()) {
@@ -41,7 +51,7 @@ export default function ProposeMenuScreen() {
 
     try {
       // Check if menu already exists for this date
-      const existingMenu = await getMenuByDate(currentGroupId, date);
+      const existingMenu = await getMenuByDate(currentGroupId, selectedDate);
 
       if (existingMenu) {
         Alert.alert(
@@ -68,7 +78,7 @@ export default function ProposeMenuScreen() {
       const menu = await createMenu(
         currentGroupId,
         menuName.trim(),
-        date,
+        selectedDate,
         userProfile.name
       );
 
@@ -96,14 +106,29 @@ export default function ProposeMenuScreen() {
             Propose Menu
           </Text>
 
-          <View style={styles.dateCard}>
+          <TouchableOpacity
+            style={styles.dateCard}
+            onPress={() => setShowDatePicker(true)}
+          >
             <Text variant="bodySmall" style={styles.label}>
               Meal Date
             </Text>
             <Text variant="titleLarge" style={styles.date}>
-              {formatDate(date, 'EEEE, MMMM d, yyyy')}
+              {formatDate(selectedDate, 'EEEE, MMMM d, yyyy')}
             </Text>
-          </View>
+            <Text variant="bodySmall" style={styles.tapHint}>
+              Tap to change
+            </Text>
+          </TouchableOpacity>
+
+          {showDatePicker && (
+            <DateTimePicker
+              value={selectedDate}
+              mode="date"
+              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+              onChange={handleDateChange}
+            />
+          )}
 
           <TextInput
             mode="outlined"
@@ -191,6 +216,11 @@ const styles = StyleSheet.create({
   date: {
     fontWeight: '600',
     color: colors.text.primary,
+  },
+  tapHint: {
+    color: colors.text.secondary,
+    marginTop: spacing.xs,
+    fontStyle: 'italic',
   },
   input: {
     marginBottom: spacing.md,

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, StyleSheet, FlatList, Alert, RefreshControl } from 'react-native';
-import { Text, FAB, Chip, IconButton, Menu, Divider, Button } from 'react-native-paper';
+import { View, StyleSheet, FlatList, Alert, RefreshControl, Platform, TouchableOpacity } from 'react-native';
+import { Text, FAB, Chip, IconButton, Menu, Divider, Button, Dialog, Portal, TextInput } from 'react-native-paper';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { RouteProp, useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -13,10 +14,13 @@ import {
   updateMenuStatus,
   toggleItemReservation,
   deleteMenu,
+  deleteMenuItem,
   toggleAttendance,
+  updateMenu,
+  getMenuByDate,
 } from '../../services/menuService';
 import { Menu as MenuType, MenuItem, RootStackParamList } from '../../types';
-import { formatDate, parseDateKey } from '../../utils/dateUtils';
+import { formatDate, parseDateKey, formatDateKey } from '../../utils/dateUtils';
 
 type MenuDetailsRouteProp = RouteProp<RootStackParamList, 'MenuDetails'>;
 type MenuDetailsNavigationProp = StackNavigationProp<RootStackParamList, 'MenuDetails'>;
@@ -33,7 +37,13 @@ export default function MenuDetailsScreen() {
   const [menuVisible, setMenuVisible] = useState(false);
   const [filter, setFilter] = useState<'all' | 'available' | 'mine'>('all');
 
-  const { menuId, dateString } = route.params;
+  // Edit menu dialog state
+  const [editDialogVisible, setEditDialogVisible] = useState(false);
+  const [editedMenuName, setEditedMenuName] = useState('');
+  const [editedDate, setEditedDate] = useState(new Date());
+  const [showEditDatePicker, setShowEditDatePicker] = useState(false);
+
+  const { menuId, dateString} = route.params;
   const date = parseDateKey(dateString);
 
   const loadMenuData = useCallback(async (isRefreshing = false) => {
@@ -94,6 +104,33 @@ export default function MenuDetailsScreen() {
     }
   };
 
+  const handleDeleteItem = (item: MenuItem) => {
+    Alert.alert(
+      'Delete Item',
+      `Are you sure you want to delete "${item.name}"?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            if (!currentGroupId) return;
+
+            try {
+              await deleteMenuItem(currentGroupId, menuId, item.id);
+
+              // Update local state
+              setItems((prev) => prev.filter((i) => i.id !== item.id));
+            } catch (error) {
+              console.error('Error deleting item:', error);
+              Alert.alert('Error', 'Failed to delete item');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const handleToggleMenuStatus = async () => {
     if (!currentGroupId || !menu) return;
 
@@ -138,6 +175,64 @@ export default function MenuDetailsScreen() {
         },
       ]
     );
+  };
+
+  const handleEditMenu = () => {
+    if (!menu) return;
+    setMenuVisible(false);
+    setEditedMenuName(menu.name);
+    setEditedDate(menu.date);
+    setEditDialogVisible(true);
+  };
+
+  const handleEditDateChange = (event: any, date?: Date) => {
+    setShowEditDatePicker(Platform.OS === 'ios');
+    if (date) {
+      setEditedDate(date);
+    }
+  };
+
+  const handleSaveEdit = async () => {
+    if (!currentGroupId || !menu) return;
+
+    if (!editedMenuName.trim()) {
+      Alert.alert('Error', 'Please enter a menu name');
+      return;
+    }
+
+    try {
+      // Check if date changed and if there's already a menu on the new date
+      const dateChanged = formatDateKey(editedDate) !== formatDateKey(menu.date);
+
+      if (dateChanged) {
+        const existingMenu = await getMenuByDate(currentGroupId, editedDate);
+        if (existingMenu && existingMenu.id !== menuId) {
+          Alert.alert(
+            'Date Conflict',
+            `A menu already exists for ${formatDate(editedDate, 'MMMM d, yyyy')}. Please choose a different date.`
+          );
+          return;
+        }
+      }
+
+      await updateMenu(currentGroupId, menuId, {
+        name: editedMenuName.trim(),
+        date: editedDate,
+      });
+
+      // Update local state
+      setMenu({
+        ...menu,
+        name: editedMenuName.trim(),
+        date: editedDate,
+      });
+
+      setEditDialogVisible(false);
+      Alert.alert('Success', 'Menu updated successfully');
+    } catch (error) {
+      console.error('Error updating menu:', error);
+      Alert.alert('Error', 'Failed to update menu');
+    }
   };
 
   const handleAddItem = () => {
@@ -211,27 +306,47 @@ export default function MenuDetailsScreen() {
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.headerContent}>
-            <Text variant="titleLarge" style={styles.headerTitle}>
-              {formatDate(date, 'EEEE, MMM d')}
+            <Text variant="headlineSmall" style={styles.headerTitle}>
+              {menu.name}
             </Text>
-            <Text variant="bodyMedium" style={styles.proposedBy}>
-              Proposed by {menu.proposedBy}
-            </Text>
+            <View style={styles.headerSubtitle}>
+              <Text variant="bodyMedium" style={styles.dateText}>
+                {formatDate(menu.date, 'EEEE, MMM d, yyyy')}
+              </Text>
+              <Text variant="bodySmall" style={styles.proposedBy}>
+                Proposed by {menu.proposedBy}
+              </Text>
+            </View>
           </View>
           <View style={styles.headerActions}>
-            <Chip
-              style={[
-                styles.statusChip,
-                {
-                  backgroundColor:
-                    menu.status === 'active'
-                      ? colors.primaryContainer
-                      : colors.warning,
-                },
-              ]}
-            >
-              {menu.status === 'active' ? 'Active' : 'Proposed'}
-            </Chip>
+            {menu.status === 'proposed' ? (
+              <Button
+                mode="contained"
+                onPress={handleToggleMenuStatus}
+                icon="check-circle"
+                style={styles.activateButton}
+                compact
+              >
+                Activate
+              </Button>
+            ) : (
+              <View style={styles.activeStatusRow}>
+                <Chip
+                  icon="check-circle"
+                  style={styles.activeChip}
+                >
+                  Active
+                </Chip>
+                <Button
+                  mode="text"
+                  onPress={handleToggleMenuStatus}
+                  compact
+                  textColor={colors.text.secondary}
+                >
+                  Deactivate
+                </Button>
+              </View>
+            )}
             <Menu
               visible={menuVisible}
               onDismiss={() => setMenuVisible(false)}
@@ -243,15 +358,9 @@ export default function MenuDetailsScreen() {
               }
             >
               <Menu.Item
-                onPress={handleToggleMenuStatus}
-                title={
-                  menu.status === 'proposed'
-                    ? 'Mark as Active'
-                    : 'Mark as Proposed'
-                }
-                leadingIcon={
-                  menu.status === 'proposed' ? 'check-circle' : 'circle-outline'
-                }
+                onPress={handleEditMenu}
+                title="Edit Menu"
+                leadingIcon="pencil"
               />
               <Divider />
               <Menu.Item
@@ -371,6 +480,7 @@ export default function MenuDetailsScreen() {
               <MenuItemCard
                 item={item}
                 onReserve={() => handleToggleReservation(item)}
+                onDelete={() => handleDeleteItem(item)}
               />
             )}
             contentContainerStyle={styles.list}
@@ -390,6 +500,59 @@ export default function MenuDetailsScreen() {
         onPress={handleAddItem}
         label="Add Item"
       />
+
+      {/* Edit Menu Dialog */}
+      <Portal>
+        <Dialog
+          visible={editDialogVisible}
+          onDismiss={() => setEditDialogVisible(false)}
+        >
+          <Dialog.Title>Edit Menu</Dialog.Title>
+          <Dialog.Content>
+            <TextInput
+              mode="outlined"
+              label="Menu Name *"
+              value={editedMenuName}
+              onChangeText={setEditedMenuName}
+              style={{ marginBottom: spacing.md }}
+            />
+
+            <TouchableOpacity
+              style={styles.editDateCard}
+              onPress={() => setShowEditDatePicker(true)}
+            >
+              <View style={styles.editDateContent}>
+                <View>
+                  <Text variant="bodySmall" style={styles.editDateLabel}>
+                    Meal Date
+                  </Text>
+                  <Text variant="titleMedium" style={styles.editDateText}>
+                    {formatDate(editedDate, 'EEEE, MMMM d, yyyy')}
+                  </Text>
+                </View>
+                <IconButton
+                  icon="calendar-edit"
+                  size={20}
+                  iconColor={colors.primary}
+                />
+              </View>
+            </TouchableOpacity>
+
+            {showEditDatePicker && (
+              <DateTimePicker
+                value={editedDate}
+                mode="date"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                onChange={handleEditDateChange}
+              />
+            )}
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setEditDialogVisible(false)}>Cancel</Button>
+            <Button onPress={handleSaveEdit}>Save</Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
     </Screen>
   );
 }
@@ -411,19 +574,36 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerTitle: {
-    fontWeight: '600',
+    fontWeight: '700',
     color: colors.text.primary,
+    marginBottom: spacing.xs,
+  },
+  headerSubtitle: {
+    gap: spacing.xs,
+  },
+  dateText: {
+    color: colors.text.primary,
+    fontWeight: '500',
   },
   proposedBy: {
     color: colors.text.secondary,
-    marginTop: spacing.xs,
   },
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: spacing.xs,
   },
-  statusChip: {
+  activateButton: {
     marginRight: spacing.xs,
+  },
+  activeStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginRight: spacing.xs,
+  },
+  activeChip: {
+    backgroundColor: colors.primaryContainer,
   },
   attendanceSection: {
     padding: spacing.md,
@@ -480,5 +660,24 @@ const styles = StyleSheet.create({
     right: spacing.md,
     bottom: spacing.md,
     backgroundColor: colors.primary,
+  },
+  editDateCard: {
+    padding: spacing.md,
+    backgroundColor: colors.primaryContainer,
+    borderRadius: borderRadius.md,
+    marginBottom: spacing.md,
+  },
+  editDateContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  editDateLabel: {
+    color: colors.text.secondary,
+    marginBottom: spacing.xs,
+  },
+  editDateText: {
+    fontWeight: '600',
+    color: colors.text.primary,
   },
 });

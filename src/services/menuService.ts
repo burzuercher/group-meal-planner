@@ -166,6 +166,33 @@ export async function getMenuByDate(
 }
 
 /**
+ * Updates menu details (name and/or date)
+ */
+export async function updateMenu(
+  groupId: string,
+  menuId: string,
+  updates: { name?: string; date?: Date }
+): Promise<void> {
+  try {
+    const menuRef = doc(db, `groups/${groupId}/menus`, menuId);
+    const updateData: any = {};
+
+    if (updates.name !== undefined) {
+      updateData.name = updates.name;
+    }
+
+    if (updates.date !== undefined) {
+      updateData.date = Timestamp.fromDate(startOfDay(updates.date));
+    }
+
+    await updateDoc(menuRef, updateData);
+  } catch (error) {
+    console.error('Error updating menu:', error);
+    throw new Error('Failed to update menu');
+  }
+}
+
+/**
  * Updates menu status
  * When changing to 'active', automatically marks all group members as attending
  */

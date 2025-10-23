@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, TouchableOpacity } from 'react-native';
-import { Card, Text, Chip } from 'react-native-paper';
+import { Card, Text, Chip, IconButton } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { MenuItem } from '../types';
 import { colors, spacing, borderRadius } from '../theme';
@@ -10,12 +10,14 @@ interface MenuItemCardProps {
   item: MenuItem;
   onPress?: () => void;
   onReserve?: () => void;
+  onDelete?: () => void;
 }
 
 export default function MenuItemCard({
   item,
   onPress,
   onReserve,
+  onDelete,
 }: MenuItemCardProps) {
   const userProfile = useAppStore((state) => state.userProfile);
   const isAvailable = !item.reservedBy;
@@ -49,7 +51,18 @@ export default function MenuItemCard({
                 {item.category}
               </Chip>
             </View>
-            <View style={[styles.statusIndicator, { backgroundColor: getStatusColor() }]} />
+            <View style={styles.headerActions}>
+              <View style={[styles.statusIndicator, { backgroundColor: getStatusColor() }]} />
+              {onDelete && (
+                <IconButton
+                  icon="delete"
+                  size={20}
+                  iconColor={colors.error}
+                  onPress={onDelete}
+                  style={styles.deleteButton}
+                />
+              )}
+            </View>
           </View>
 
           {item.quantity && (
@@ -137,10 +150,18 @@ const styles = StyleSheet.create({
   categoryText: {
     fontSize: 12,
   },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
   statusIndicator: {
     width: 12,
     height: 12,
     borderRadius: borderRadius.round,
+  },
+  deleteButton: {
+    margin: 0,
   },
   row: {
     flexDirection: 'row',
