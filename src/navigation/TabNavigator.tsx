@@ -7,7 +7,6 @@ import { colors } from '../theme';
 // Import screens
 import CalendarScreen from '../screens/Calendar/CalendarScreen';
 import WeekMenuScreen from '../screens/Menu/WeekMenuScreen';
-import ShoppingListScreen from '../screens/ShoppingList/ShoppingListScreen';
 import GroupsScreen from '../screens/Groups/GroupsScreen';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -22,16 +21,6 @@ export default function TabNavigator() {
       }}
     >
       <Tab.Screen
-        name="Calendar"
-        component={CalendarScreen}
-        options={{
-          title: 'Calendar',
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="calendar" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tab.Screen
         name="WeekMenu"
         component={WeekMenuScreen}
         options={{
@@ -42,12 +31,12 @@ export default function TabNavigator() {
         }}
       />
       <Tab.Screen
-        name="ShoppingList"
-        component={ShoppingListScreen}
+        name="Calendar"
+        component={CalendarScreen}
         options={{
-          title: 'Shopping List',
+          title: 'Calendar',
           tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="cart" size={size} color={color} />
+            <MaterialCommunityIcons name="calendar" size={size} color={color} />
           ),
         }}
       />

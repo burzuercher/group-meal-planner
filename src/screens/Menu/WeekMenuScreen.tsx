@@ -315,6 +315,7 @@ const styles = StyleSheet.create({
   statValue: {
     fontWeight: '700',
     fontSize: 24,
+    lineHeight: 28,
   },
   statLabel: {
     color: colors.text.secondary,
