@@ -2,67 +2,120 @@ import { MD3LightTheme as DefaultTheme, configureFonts } from 'react-native-pape
 
 // Custom color palette
 const colors = {
-  primary: '#6200ee',
-  primaryContainer: '#bb86fc',
-  secondary: '#03dac6',
-  secondaryContainer: '#018786',
-  background: '#f5f5f5',
+  primary: '#2e7d32',        // Fresh green - suggests food, health, freshness
+  primaryContainer: '#e8f5e9', // Light green tint
+  secondary: '#ff6f00',       // Warm orange accent
+  secondaryContainer: '#fff3e0',
+  background: '#fafafa',      // Softer than pure gray
   surface: '#ffffff',
-  error: '#b00020',
-  success: '#4caf50',
-  warning: '#ff9800',
+  error: '#d32f2f',
+  success: '#2e7d32',         // Same as primary for consistency
+  warning: '#f57c00',         // Amber for pending/proposed states
+
+  // Menu status colors
+  menuActive: '#2e7d32',      // Green for confirmed/active menus
+  menuProposed: '#f57c00',    // Amber for proposed/pending menus
+  menuActiveContainer: '#e8f5e9',
+  menuProposedContainer: '#fff3e0',
 
   // Item status colors
-  available: '#4caf50',     // Green for available items
-  reserved: '#9e9e9e',      // Gray for items reserved by others
-  myReserved: '#2196f3',    // Blue for items reserved by user
+  available: '#2e7d32',       // Green for available items
+  reserved: '#757575',        // Medium gray for items reserved by others
+  myReserved: '#1976d2',      // Clear blue for items reserved by user
 
   text: {
-    primary: '#000000',
-    secondary: '#666666',
-    disabled: '#9e9e9e',
+    primary: '#212121',       // Softer black
+    secondary: '#757575',     // Medium gray
+    disabled: '#bdbdbd',      // Light gray
     onPrimary: '#ffffff',
   },
 
   border: '#e0e0e0',
+  elevation: {
+    level1: 'rgba(0, 0, 0, 0.05)',
+    level2: 'rgba(0, 0, 0, 0.08)',
+  },
 };
 
-// Typography
+// Typography - Standardized hierarchy
 const fontConfig = {
   displayLarge: {
     fontSize: 32,
     fontWeight: '700' as const,
     lineHeight: 40,
+    letterSpacing: 0,
   },
   displayMedium: {
     fontSize: 28,
-    fontWeight: '600' as const,
+    fontWeight: '700' as const,
     lineHeight: 36,
+    letterSpacing: 0,
+  },
+  headlineLarge: {
+    fontSize: 24,
+    fontWeight: '600' as const,
+    lineHeight: 32,
+    letterSpacing: 0,
+  },
+  headlineMedium: {
+    fontSize: 20,
+    fontWeight: '600' as const,
+    lineHeight: 28,
+    letterSpacing: 0,
+  },
+  headlineSmall: {
+    fontSize: 18,
+    fontWeight: '600' as const,
+    lineHeight: 26,
+    letterSpacing: 0,
   },
   titleLarge: {
     fontSize: 22,
-    fontWeight: '600' as const,
+    fontWeight: '500' as const,
     lineHeight: 28,
+    letterSpacing: 0,
   },
   titleMedium: {
-    fontSize: 18,
-    fontWeight: '600' as const,
+    fontSize: 16,
+    fontWeight: '500' as const,
     lineHeight: 24,
+    letterSpacing: 0.15,
+  },
+  titleSmall: {
+    fontSize: 14,
+    fontWeight: '500' as const,
+    lineHeight: 20,
+    letterSpacing: 0.1,
   },
   bodyLarge: {
     fontSize: 16,
     fontWeight: '400' as const,
     lineHeight: 24,
+    letterSpacing: 0.5,
   },
   bodyMedium: {
     fontSize: 14,
     fontWeight: '400' as const,
     lineHeight: 20,
+    letterSpacing: 0.25,
+  },
+  bodySmall: {
+    fontSize: 12,
+    fontWeight: '400' as const,
+    lineHeight: 16,
+    letterSpacing: 0.4,
   },
   labelLarge: {
     fontSize: 14,
     fontWeight: '500' as const,
     lineHeight: 20,
+    letterSpacing: 0.1,
+  },
+  labelMedium: {
+    fontSize: 12,
+    fontWeight: '500' as const,
+    lineHeight: 16,
+    letterSpacing: 0.5,
   },
 };
 
@@ -102,6 +155,38 @@ export const borderRadius = {
   lg: 12,
   xl: 16,
   round: 999,
+};
+
+// Elevation/Shadow values for depth
+export const elevation = {
+  none: {
+    shadowColor: 'transparent',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
+  },
+  level1: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  level2: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  level3: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 3,
+  },
 };
 
 export default theme;

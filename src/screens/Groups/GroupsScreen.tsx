@@ -12,7 +12,7 @@ import {
 } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Screen, EmptyState, Loading } from '../../components';
-import { colors, spacing, borderRadius } from '../../theme';
+import { colors, spacing, borderRadius, elevation } from '../../theme';
 import { useAppStore } from '../../store';
 import { createGroup, joinGroup, getGroupById } from '../../services/groupService';
 import { Group, GroupMembership } from '../../types';
@@ -412,10 +412,11 @@ const styles = StyleSheet.create({
   card: {
     marginBottom: spacing.md,
     borderRadius: borderRadius.lg,
+    ...elevation.level1,
   },
   activeCard: {
-    borderWidth: 2,
-    borderColor: colors.primary,
+    backgroundColor: colors.primaryContainer,
+    ...elevation.level2,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -433,11 +434,13 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   activeChip: {
-    backgroundColor: colors.primaryContainer,
+    backgroundColor: colors.primary,
     height: 24,
   },
   activeChipText: {
     fontSize: 11,
+    color: colors.text.onPrimary,
+    fontWeight: '600',
   },
   cardActions: {
     flexDirection: 'row',

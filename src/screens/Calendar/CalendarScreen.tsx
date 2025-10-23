@@ -5,7 +5,7 @@ import { Calendar, DateData } from 'react-native-calendars';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Screen, EmptyState } from '../../components';
-import { colors, spacing, borderRadius } from '../../theme';
+import { colors, spacing, borderRadius, elevation } from '../../theme';
 import { useAppStore } from '../../store';
 import { getMenusInRange } from '../../services/menuService';
 import { Menu, RootStackParamList } from '../../types';
@@ -72,7 +72,7 @@ export default function CalendarScreen() {
       const dateKey = formatDateKey(menu.date);
       marked[dateKey] = {
         marked: true,
-        dotColor: menu.status === 'active' ? colors.primary : colors.warning,
+        dotColor: menu.status === 'active' ? colors.menuActive : colors.menuProposed,
       };
     });
 
@@ -156,13 +156,13 @@ export default function CalendarScreen() {
 
         <View style={styles.legend}>
           <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: colors.primary }]} />
+            <View style={[styles.legendDot, { backgroundColor: colors.menuActive }]} />
             <Text variant="bodySmall" style={styles.legendText}>
               Active Menu
             </Text>
           </View>
           <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: colors.warning }]} />
+            <View style={[styles.legendDot, { backgroundColor: colors.menuProposed }]} />
             <Text variant="bodySmall" style={styles.legendText}>
               Proposed Menu
             </Text>
@@ -186,10 +186,17 @@ export default function CalendarScreen() {
                       {
                         backgroundColor:
                           selectedMenu.status === 'active'
-                            ? colors.primaryContainer
-                            : colors.warning,
+                            ? colors.menuActiveContainer
+                            : colors.menuProposedContainer,
                       },
                     ]}
+                    textStyle={{
+                      color: selectedMenu.status === 'active'
+                        ? colors.menuActive
+                        : colors.menuProposed,
+                      fontWeight: '500',
+                    }}
+                    compact
                   >
                     {selectedMenu.status === 'active' ? 'Active' : 'Proposed'}
                   </Chip>
@@ -243,26 +250,31 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: spacing.lg,
     padding: spacing.md,
+    paddingVertical: spacing.lg,
     backgroundColor: colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
   legendItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
+    gap: spacing.sm,
   },
   legendDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
   },
   legendText: {
     color: colors.text.secondary,
+    fontSize: 13,
   },
   selectedDateCard: {
     margin: spacing.md,
     padding: spacing.lg,
     backgroundColor: colors.surface,
     borderRadius: borderRadius.lg,
+    ...elevation.level1,
   },
   selectedDateTitle: {
     fontWeight: '600',

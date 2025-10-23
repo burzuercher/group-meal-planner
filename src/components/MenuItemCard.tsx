@@ -3,7 +3,7 @@ import { View, StyleSheet, TouchableOpacity } from 'react-native';
 import { Card, Text, Chip, IconButton } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { MenuItem } from '../types';
-import { colors, spacing, borderRadius } from '../theme';
+import { colors, spacing, borderRadius, elevation } from '../theme';
 import { useAppStore } from '../store';
 
 interface MenuItemCardProps {
@@ -45,7 +45,7 @@ export default function MenuItemCard({
                 {item.name}
               </Text>
               <Chip
-                style={[styles.categoryChip, { backgroundColor: colors.primaryContainer }]}
+                style={styles.categoryChip}
                 textStyle={styles.categoryText}
               >
                 {item.category}
@@ -129,39 +129,45 @@ const styles = StyleSheet.create({
     marginVertical: spacing.sm,
     marginHorizontal: spacing.md,
     borderRadius: borderRadius.lg,
+    backgroundColor: colors.surface,
+    ...elevation.level1,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: spacing.sm,
+    marginBottom: spacing.md,
   },
   titleContainer: {
     flex: 1,
-    marginRight: spacing.sm,
+    marginRight: spacing.md,
   },
   title: {
-    fontWeight: '600',
-    marginBottom: spacing.xs,
+    fontWeight: '500',
+    color: colors.text.primary,
+    marginBottom: spacing.sm,
   },
   categoryChip: {
     alignSelf: 'flex-start',
+    backgroundColor: colors.primaryContainer,
+    height: 24,
   },
   categoryText: {
-    fontSize: 12,
+    fontSize: 11,
+    fontWeight: '500',
   },
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
+    gap: spacing.sm,
   },
   statusIndicator: {
-    width: 12,
-    height: 12,
+    width: 10,
+    height: 10,
     borderRadius: borderRadius.round,
   },
   deleteButton: {
-    margin: 0,
+    margin: -8,
   },
   row: {
     flexDirection: 'row',
@@ -182,18 +188,24 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginTop: spacing.md,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
   },
   status: {
-    fontWeight: '600',
+    fontWeight: '500',
+    fontSize: 13,
   },
   reserveButton: {
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderRadius: borderRadius.md,
+    minHeight: 32,
+    justifyContent: 'center',
   },
   reserveButtonText: {
     color: colors.text.onPrimary,
     fontWeight: '600',
-    fontSize: 12,
+    fontSize: 13,
   },
 });

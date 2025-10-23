@@ -5,7 +5,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { RouteProp, useRoute, useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Screen, Loading } from '../../components';
-import { colors, spacing, borderRadius } from '../../theme';
+import { colors, spacing, borderRadius, elevation } from '../../theme';
 import { useAppStore } from '../../store';
 import { createMenu, getMenuByDate } from '../../services/menuService';
 import { RootStackParamList } from '../../types';
@@ -205,9 +205,12 @@ const styles = StyleSheet.create({
   },
   dateCard: {
     padding: spacing.lg,
-    backgroundColor: colors.primaryContainer,
+    backgroundColor: colors.surface,
     borderRadius: borderRadius.lg,
     marginBottom: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    ...elevation.level1,
   },
   label: {
     color: colors.text.secondary,

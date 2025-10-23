@@ -6,7 +6,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { RouteProp, useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Screen, Loading, EmptyState, MenuItemCard } from '../../components';
-import { colors, spacing, borderRadius } from '../../theme';
+import { colors, spacing, borderRadius, elevation } from '../../theme';
 import { useAppStore } from '../../store';
 import {
   getMenuById,
@@ -325,6 +325,7 @@ export default function MenuDetailsScreen() {
                 onPress={handleToggleMenuStatus}
                 icon="check-circle"
                 style={styles.activateButton}
+                buttonColor={colors.menuActive}
                 compact
               >
                 Activate
@@ -334,6 +335,8 @@ export default function MenuDetailsScreen() {
                 <Chip
                   icon="check-circle"
                   style={styles.activeChip}
+                  textStyle={styles.activeChipText}
+                  compact
                 >
                   Active
                 </Chip>
@@ -342,6 +345,7 @@ export default function MenuDetailsScreen() {
                   onPress={handleToggleMenuStatus}
                   compact
                   textColor={colors.text.secondary}
+                  style={styles.deactivateButton}
                 >
                   Deactivate
                 </Button>
@@ -603,7 +607,14 @@ const styles = StyleSheet.create({
     marginRight: spacing.xs,
   },
   activeChip: {
-    backgroundColor: colors.primaryContainer,
+    backgroundColor: colors.menuActiveContainer,
+  },
+  activeChipText: {
+    color: colors.menuActive,
+    fontWeight: '500',
+  },
+  deactivateButton: {
+    minWidth: 0,
   },
   attendanceSection: {
     padding: spacing.md,
@@ -663,9 +674,11 @@ const styles = StyleSheet.create({
   },
   editDateCard: {
     padding: spacing.md,
-    backgroundColor: colors.primaryContainer,
+    backgroundColor: colors.surface,
     borderRadius: borderRadius.md,
     marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   editDateContent: {
     flexDirection: 'row',

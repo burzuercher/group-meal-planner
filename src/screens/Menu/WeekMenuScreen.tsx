@@ -4,7 +4,7 @@ import { Text, Card, FAB, Chip } from 'react-native-paper';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Screen, EmptyState, Loading } from '../../components';
-import { colors, spacing, borderRadius } from '../../theme';
+import { colors, spacing, borderRadius, elevation } from '../../theme';
 import { useAppStore } from '../../store';
 import { getMenusInRange, getMenuItems } from '../../services/menuService';
 import { Menu, MenuItem, RootStackParamList } from '../../types';
@@ -176,10 +176,16 @@ function WeekMenuCard({ menu, onPress }: WeekMenuCardProps) {
                 {
                   backgroundColor:
                     menu.status === 'active'
-                      ? colors.primaryContainer
-                      : colors.warning,
+                      ? colors.menuActiveContainer
+                      : colors.menuProposedContainer,
                 },
               ]}
+              textStyle={{
+                color: menu.status === 'active'
+                  ? colors.menuActive
+                  : colors.menuProposed,
+                fontWeight: '500',
+              }}
               compact
             >
               {menu.status === 'active' ? 'Active' : 'Proposed'}
@@ -281,6 +287,7 @@ const styles = StyleSheet.create({
   card: {
     marginBottom: spacing.md,
     borderRadius: borderRadius.lg,
+    ...elevation.level1,
   },
   cardHeader: {
     marginBottom: spacing.sm,
@@ -330,9 +337,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   itemDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
     marginRight: spacing.sm,
   },
   itemPreviewText: {

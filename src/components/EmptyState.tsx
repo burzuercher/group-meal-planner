@@ -23,8 +23,9 @@ export default function EmptyState({
     <View style={styles.container}>
       <MaterialCommunityIcons
         name={icon}
-        size={64}
-        color={colors.text.disabled}
+        size={72}
+        color={colors.text.secondary}
+        style={{ opacity: 0.4 }}
       />
       <Text variant="titleLarge" style={styles.title}>
         {title}
