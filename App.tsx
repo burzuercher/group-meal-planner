@@ -3,6 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 import { AppState, AppStateStatus } from 'react-native';
 import { PaperProvider } from 'react-native-paper';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import AppNavigator from './src/navigation/AppNavigator';
 import { GroupSelectorModal } from './src/components';
 import { theme } from './src/theme';
@@ -25,7 +26,16 @@ export default function App() {
 
   useEffect(() => {
     // Load user profile from AsyncStorage on app start
-    loadUserProfile();
+    const initializeApp = async () => {
+      // Check if we should clear storage (useful for testing onboarding)
+      if (process.env.CLEAR_STORAGE_ON_START === 'true') {
+        console.log('CLEAR_STORAGE_ON_START is enabled - clearing AsyncStorage');
+        await AsyncStorage.clear();
+      }
+      loadUserProfile();
+    };
+
+    initializeApp();
   }, []);
 
   useEffect(() => {

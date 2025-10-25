@@ -278,6 +278,7 @@ export default function CalendarScreen() {
         style={styles.fab}
         onPress={handleProposeMenu}
         label="Propose Menu"
+        color={colors.text.onPrimary}
       />
     </Screen>
   );

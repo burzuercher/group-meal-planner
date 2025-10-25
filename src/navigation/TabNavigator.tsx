@@ -24,7 +24,7 @@ export default function TabNavigator() {
         name="WeekMenu"
         component={WeekMenuScreen}
         options={{
-          title: 'This Week',
+          title: 'Upcoming',
           headerShown: false,
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons name="food" size={size} color={color} />

@@ -457,7 +457,7 @@ export default function MenuDetailsScreen() {
                   color={colors.primary}
                 />
                 <Text variant="titleSmall" style={styles.attendanceTitle}>
-                  Attendance: {menu.attendees.reduce((sum, a) => sum + a.adults + a.children, 0)} people
+                  Attendance: {menu.attendees.reduce((sum, a) => sum + a.adults, 0)} adults, {menu.attendees.reduce((sum, a) => sum + a.children, 0)} children ({menu.attendees.reduce((sum, a) => sum + a.adults + a.children, 0)} total)
                 </Text>
               </View>
               <Button
@@ -511,7 +511,10 @@ export default function MenuDetailsScreen() {
                       textStyle={styles.attendeeChipText}
                       compact
                     >
-                      {attendee.name === userProfile?.name ? 'You' : attendee.name} ({attendee.adults + attendee.children})
+                      {attendee.name === userProfile?.name ? 'You' : attendee.name} ({[
+                        attendee.adults > 0 ? `${attendee.adults}A` : null,
+                        attendee.children > 0 ? `${attendee.children}C` : null,
+                      ].filter(Boolean).join(', ')})
                     </Chip>
                   </View>
                 ))}
@@ -584,6 +587,7 @@ export default function MenuDetailsScreen() {
         style={styles.fab}
         onPress={handleAddItem}
         label="Add Item"
+        color={colors.text.onPrimary}
       />
 
       {/* Edit Menu Dialog */}
@@ -736,6 +740,7 @@ const styles = StyleSheet.create({
   attendanceTitle: {
     fontWeight: '600',
     color: colors.text.primary,
+    flex: 1,
   },
   attendanceButton: {
     marginLeft: spacing.sm,

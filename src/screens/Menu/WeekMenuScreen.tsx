@@ -190,6 +190,7 @@ export default function WeekMenuScreen() {
         style={styles.fab}
         onPress={handleProposeMenu}
         label="Propose Menu"
+        color={colors.text.onPrimary}
       />
 
       {/* Image Lightbox */}
@@ -321,7 +322,7 @@ function WeekMenuCard({ menu, onPress, onImagePress, userProfile, groupMembers }
               color={colors.text.secondary}
             />
             <Text variant="bodySmall" style={styles.attendanceText}>
-              {menu.attendees.length} attending
+              {menu.attendees.reduce((sum, a) => sum + a.adults, 0)} adults, {menu.attendees.reduce((sum, a) => sum + a.children, 0)} children ({menu.attendees.reduce((sum, a) => sum + a.adults + a.children, 0)} total)
             </Text>
           </View>
         )}
@@ -473,6 +474,7 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
     fontSize: 12,
     fontWeight: '500',
+    flex: 1,
   },
   itemPreview: {
     marginTop: spacing.md,
