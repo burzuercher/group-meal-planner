@@ -1,6 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
+import { getFunctions, connectFunctionsEmulator } from 'firebase/functions';
 import {
   FIREBASE_API_KEY,
   FIREBASE_AUTH_DOMAIN,
@@ -9,7 +10,6 @@ import {
   FIREBASE_MESSAGING_SENDER_ID,
   FIREBASE_APP_ID,
   FIREBASE_MEASUREMENT_ID,
-  GEMINI_API_KEY as GEMINI_KEY,
 } from '@env';
 
 // Firebase configuration
@@ -23,10 +23,6 @@ const firebaseConfig = {
   measurementId: FIREBASE_MEASUREMENT_ID,
 };
 
-// Gemini API Configuration
-// Get your API key from: https://aistudio.google.com/app/apikey
-export const GEMINI_API_KEY = GEMINI_KEY;
-
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
@@ -35,6 +31,12 @@ export const db = getFirestore(app);
 
 // Initialize Storage
 export const storage = getStorage(app);
+
+// Initialize Cloud Functions
+export const functions = getFunctions(app, 'us-central1');
+
+// Uncomment to use Firebase Functions Emulator during development
+// connectFunctionsEmulator(functions, 'localhost', 5001);
 
 // Note: Push notifications will be implemented using expo-notifications
 // instead of Firebase Messaging (which is web-only)

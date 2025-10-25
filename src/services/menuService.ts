@@ -77,7 +77,7 @@ export async function createMenu(
     };
 
     // Generate image in background (don't await)
-    generateMenuImageInBackground(groupId, menuRef.id, name);
+    generateMenuImageInBackground(groupId, menuRef.id, name, proposedBy);
 
     return menu;
   } catch (error) {
@@ -92,10 +92,11 @@ export async function createMenu(
 async function generateMenuImageInBackground(
   groupId: string,
   menuId: string,
-  menuName: string
+  menuName: string,
+  userName: string
 ): Promise<void> {
   try {
-    const imageUrl = await generateAndCacheMenuImage(menuName);
+    const imageUrl = await generateAndCacheMenuImage(menuName, groupId, userName);
 
     // Update menu with generated image URL
     await updateMenuImage(groupId, menuId, imageUrl);

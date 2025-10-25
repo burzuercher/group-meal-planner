@@ -18,12 +18,26 @@ Note: There are no test or lint scripts configured in this project.
 
 ## Firebase Configuration
 
-**CRITICAL**: Before running the app, you must configure Firebase credentials in `src/services/firebase.ts`. The file currently contains development credentials that may not work for all users.
+**CRITICAL**: Before running the app, you must configure Firebase credentials and Cloud Functions.
+
+### Client App Configuration
 
 1. Create a Firebase project at https://console.firebase.google.com/
 2. Enable Firestore Database (start in test mode for development)
-3. Enable Cloud Messaging (for push notifications)
-4. Replace the `firebaseConfig` object in `src/services/firebase.ts` with your project credentials
+3. Enable Firebase Storage (for menu images)
+4. Enable Cloud Messaging (for push notifications)
+5. Create a `.env` file based on `.env.example` with your Firebase credentials
+
+### Cloud Functions Configuration
+
+The app uses Firebase Cloud Functions (v2) for secure image generation with Gemini AI.
+
+1. Install dependencies: `cd functions && npm install`
+2. Configure Gemini API key (see `functions/README.md` for details)
+3. Build functions: `npm run build`
+4. Deploy: `firebase deploy --only functions`
+
+**Important**: The Gemini API key is stored securely in Firebase Functions and never exposed to the client.
 
 ## Architecture Overview
 
@@ -61,15 +75,33 @@ This nested structure is important:
 
 ### Service Layer Pattern
 
-The app uses a service layer to abstract Firestore operations:
+The app uses a service layer to abstract Firebase operations:
 
 - **`groupService.ts`**: Create groups, join by code, get group data
 - **`menuService.ts`**: CRUD for menus and menu items, reservation system, attendance tracking
+- **`imageService.ts`**: Menu image generation via Cloud Functions (with caching and budget tracking)
 
 Key service patterns:
 - All date fields are converted between JavaScript `Date` and Firestore `Timestamp`
 - Services throw errors with user-friendly messages
 - Optional fields are filtered out before Firestore writes to avoid undefined values
+
+### Cloud Functions
+
+The app uses Firebase Cloud Functions v2 for secure server-side operations:
+
+- **`generateMenuImage`**: Callable function that generates menu images using Gemini AI
+  - **Security**: Validates group membership before generating images
+  - **Caching**: Checks for existing images to avoid duplicate generation
+  - **Budget tracking**: Enforces a $25 cap on total image generation costs
+  - **Storage**: Uploads generated images to Firebase Storage
+  - Located in: `functions/src/index.ts`
+
+**Why Cloud Functions?**
+- Keeps Gemini API key secure (never exposed to client)
+- Prevents client-side budget manipulation
+- Centralizes image generation logic
+- Enables server-side validation and security rules
 
 ### Navigation Flow
 
