@@ -11,7 +11,8 @@ import { useAppStore } from '../../store';
 import { getMenusInRange, getMenuItems } from '../../services/menuService';
 import { getGroupById } from '../../services/groupService';
 import { Menu, MenuItem, RootStackParamList, GroupMember } from '../../types';
-import { getCurrentWeekRange, formatDate, formatDateKey } from '../../utils/dateUtils';
+import { formatDate, formatDateKey } from '../../utils/dateUtils';
+import { startOfDay, addYears } from 'date-fns';
 
 type WeekMenuNavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -32,11 +33,11 @@ export default function WeekMenuScreen() {
 
   useFocusEffect(
     React.useCallback(() => {
-      loadWeekMenus();
+      loadUpcomingMenus();
     }, [currentGroupId])
   );
 
-  const loadWeekMenus = async (isRefresh = false) => {
+  const loadUpcomingMenus = async (isRefresh = false) => {
     if (!currentGroupId) {
       setLoading(false);
       return;
@@ -49,17 +50,23 @@ export default function WeekMenuScreen() {
     }
 
     try {
-      const { start, end } = getCurrentWeekRange();
-      const [weekMenus, groupData] = await Promise.all([
-        getMenusInRange(currentGroupId, start, end),
+      // Fetch upcoming meals from today onwards, limit to 20
+      const today = startOfDay(new Date());
+      const futureLimit = addYears(today, 1); // 1 year ahead as safety limit
+
+      const [allUpcomingMenus, groupData] = await Promise.all([
+        getMenusInRange(currentGroupId, today, futureLimit),
         getGroupById(currentGroupId),
       ]);
+
+      // Limit to first 20 upcoming meals
+      const upcomingMenus = allUpcomingMenus.slice(0, 20);
 
       setGroupMembers(groupData?.members || []);
 
       // Load items for each menu
       const menusWithItems = await Promise.all(
-        weekMenus.map(async (menu) => {
+        upcomingMenus.map(async (menu) => {
           const items = await getMenuItems(currentGroupId, menu.id);
           const availableCount = items.filter((i) => !i.reservedBy).length;
           const myCount = items.filter(
@@ -77,7 +84,7 @@ export default function WeekMenuScreen() {
 
       setMenus(menusWithItems);
     } catch (error) {
-      console.error('Error loading week menus:', error);
+      console.error('Error loading upcoming menus:', error);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -85,7 +92,7 @@ export default function WeekMenuScreen() {
   };
 
   const handleRefresh = () => {
-    loadWeekMenus(true);
+    loadUpcomingMenus(true);
   };
 
   const handleProposeMenu = () => {
@@ -112,10 +119,8 @@ export default function WeekMenuScreen() {
   }
 
   if (loading) {
-    return <Loading message="Loading this week's menus..." />;
+    return <Loading message="Loading upcoming meals..." />;
   }
-
-  const { start, end } = getCurrentWeekRange();
 
   return (
     <Screen>
@@ -127,18 +132,15 @@ export default function WeekMenuScreen() {
           style={styles.header}
         >
           <Text variant="displaySmall" style={styles.headerTitle}>
-            This Week
-          </Text>
-          <Text variant="bodyMedium" style={styles.headerSubtitle}>
-            {formatDate(start, 'MMM d')} - {formatDate(end, 'MMM d, yyyy')}
+            Upcoming Meals
           </Text>
         </LinearGradient>
 
         {menus.length === 0 ? (
           <EmptyState
             icon="calendar-blank"
-            title="No Meals This Week"
-            message="No meals have been planned for this week yet"
+            title="No Upcoming Meals"
+            message="No meals have been planned yet"
             actionLabel="Propose Menu"
             onAction={handleProposeMenu}
           />
@@ -359,13 +361,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 32,
     color: colors.text.primary,
-    marginBottom: spacing.xs,
     letterSpacing: -0.5,
-  },
-  headerSubtitle: {
-    color: colors.text.secondary,
-    fontSize: 13,
-    fontWeight: '400',
   },
   list: {
     padding: spacing.md,
