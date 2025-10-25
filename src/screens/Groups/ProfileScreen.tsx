@@ -15,14 +15,19 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useNavigation } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
 import { Screen, EmptyState, Loading, Avatar, PartySizeInput } from '../../components';
 import { colors, spacing, borderRadius, elevation, gradients } from '../../theme';
 import { useAppStore } from '../../store';
 import { createGroup, joinGroup, getGroupById, updateMemberInfo } from '../../services/groupService';
 import { uploadProfileImage } from '../../services/storageService';
-import { Group, GroupMembership } from '../../types';
+import { Group, GroupMembership, RootStackParamList } from '../../types';
+
+type ProfileScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
 export default function ProfileScreen() {
+  const navigation = useNavigation<ProfileScreenNavigationProp>();
   const { userProfile, currentGroupId, addGroup, setCurrentGroup, removeGroup, updateProfileInfo } =
     useAppStore();
 
@@ -488,6 +493,7 @@ export default function ProfileScreen() {
                   group={item}
                   isActive={item.groupId === currentGroupId}
                   onPress={() => setCurrentGroup(item.groupId)}
+                  onEdit={() => navigation.navigate('GroupDetails', { groupId: item.groupId })}
                   onShare={() => shareGroupCode(item.groupName, item.code)}
                   onRemove={() => handleRemoveGroup(item)}
                 />
@@ -647,11 +653,12 @@ interface GroupCardProps {
   group: GroupMembership & { memberCount: number };
   isActive: boolean;
   onPress: () => void;
+  onEdit: () => void;
   onShare: () => void;
   onRemove: () => void;
 }
 
-function GroupCard({ group, isActive, onPress, onShare, onRemove }: GroupCardProps) {
+function GroupCard({ group, isActive, onPress, onEdit, onShare, onRemove }: GroupCardProps) {
   return (
     <Card
       style={[styles.card, isActive && styles.activeCard]}
@@ -674,6 +681,7 @@ function GroupCard({ group, isActive, onPress, onShare, onRemove }: GroupCardPro
             )}
           </View>
           <View style={styles.cardActions}>
+            <IconButton icon="pencil" size={20} onPress={onEdit} />
             <IconButton icon="share-variant" size={20} onPress={onShare} />
             <IconButton icon="close" size={20} onPress={onRemove} />
           </View>

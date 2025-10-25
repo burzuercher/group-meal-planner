@@ -10,6 +10,7 @@ import OnboardingScreen from '../screens/Onboarding/OnboardingScreen';
 import ProposeMenuScreen from '../screens/Menu/ProposeMenuScreen';
 import MenuDetailsScreen from '../screens/Menu/MenuDetailsScreen';
 import AddEditItemScreen from '../screens/Menu/AddEditItemScreen';
+import GroupDetailsScreen from '../screens/Groups/GroupDetailsScreen';
 
 const Stack = createStackNavigator<RootStackParamList>();
 
@@ -54,6 +55,14 @@ export default function AppNavigator() {
                 headerShown: true,
                 title: 'Add Item',
                 presentation: 'modal'
+              }}
+            />
+            <Stack.Screen
+              name="GroupDetails"
+              component={GroupDetailsScreen}
+              options={{
+                headerShown: true,
+                title: 'Group Details'
               }}
             />
           </>

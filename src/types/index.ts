@@ -101,6 +101,7 @@ export type RootStackParamList = {
   MenuDetails: { menuId: string; dateString: string }; // ISO date string
   AddEditItem: { menuId: string; itemId?: string };
   ItemDetails: { item: MenuItem };
+  GroupDetails: { groupId: string };
 };
 
 export type MainTabParamList = {

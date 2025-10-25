@@ -250,3 +250,69 @@ export async function updateMemberInfo(
     throw new Error('Failed to update member info');
   }
 }
+
+/**
+ * Updates a group's name
+ */
+export async function updateGroupName(
+  groupId: string,
+  newName: string
+): Promise<void> {
+  try {
+    if (!newName.trim() || newName.trim().length < 2) {
+      throw new Error('Group name must be at least 2 characters');
+    }
+
+    const groupRef = doc(db, GROUPS_COLLECTION, groupId);
+    await updateDoc(groupRef, {
+      name: newName.trim(),
+    });
+  } catch (error) {
+    console.error('Error updating group name:', error);
+    if (error instanceof Error && error.message.includes('must be at least')) {
+      throw error;
+    }
+    throw new Error('Failed to update group name');
+  }
+}
+
+/**
+ * Removes a member from a group
+ */
+export async function removeMemberFromGroup(
+  groupId: string,
+  memberName: string
+): Promise<void> {
+  try {
+    const group = await getGroupById(groupId);
+    if (!group) {
+      throw new Error('Group not found');
+    }
+
+    // Filter out the member to remove
+    const updatedMembers = group.members.filter(
+      (member) => member.name !== memberName
+    );
+
+    if (updatedMembers.length === group.members.length) {
+      throw new Error('Member not found in group');
+    }
+
+    // Convert dates for Firestore
+    const firestoreMembers = updatedMembers.map((member) => ({
+      ...member,
+      joinedAt: Timestamp.fromDate(member.joinedAt),
+    }));
+
+    const groupRef = doc(db, GROUPS_COLLECTION, groupId);
+    await updateDoc(groupRef, {
+      members: firestoreMembers,
+    });
+  } catch (error) {
+    console.error('Error removing member from group:', error);
+    if (error instanceof Error && (error.message.includes('not found'))) {
+      throw error;
+    }
+    throw new Error('Failed to remove member from group');
+  }
+}
