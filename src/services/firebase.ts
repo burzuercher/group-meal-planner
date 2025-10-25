@@ -7,7 +7,7 @@ const firebaseConfig = {
   apiKey: "YOUR_FIREBASE_API_KEY_HERE",
   authDomain: "lifegroup-menu-planner.firebaseapp.com",
   projectId: "lifegroup-menu-planner",
-  storageBucket: "lifegroup-menu-planner.appspot.com", // Legacy bucket (free tier)
+  storageBucket: "lifegroup-menu-planner.firebasestorage.app", // Legacy bucket (free tier)
   messagingSenderId: "YOUR_SENDER_ID",
   appId: "1:YOUR_SENDER_ID:web:9cf8fcc2055bdd05a2f4ae",
   measurementId: "YOUR_MEASUREMENT_ID"
