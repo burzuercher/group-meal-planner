@@ -144,26 +144,6 @@ export default function ProposeMenuScreen() {
             error={!!error && !menuName.trim()}
           />
 
-          <View style={styles.infoCard}>
-            <Text variant="bodyMedium" style={styles.infoText}>
-              After creating the menu, you can:
-            </Text>
-            <View style={styles.bulletList}>
-              <Text variant="bodyMedium" style={styles.bullet}>
-                • Add suggested menu items
-              </Text>
-              <Text variant="bodyMedium" style={styles.bullet}>
-                • Reserve items you'll bring
-              </Text>
-              <Text variant="bodyMedium" style={styles.bullet}>
-                • Let others add and reserve items
-              </Text>
-              <Text variant="bodyMedium" style={styles.bullet}>
-                • Set the menu as "Active" when ready
-              </Text>
-            </View>
-          </View>
-
           {error && <Text style={styles.errorText}>{error}</Text>}
         </View>
 
@@ -192,11 +172,10 @@ export default function ProposeMenuScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'space-between',
     padding: spacing.lg,
   },
   content: {
-    flex: 1,
+    marginBottom: spacing.xl,
   },
   title: {
     fontWeight: '700',
@@ -227,23 +206,6 @@ const styles = StyleSheet.create({
   },
   input: {
     marginBottom: spacing.md,
-  },
-  infoCard: {
-    padding: spacing.lg,
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  infoText: {
-    color: colors.text.primary,
-    marginBottom: spacing.md,
-  },
-  bulletList: {
-    gap: spacing.sm,
-  },
-  bullet: {
-    color: colors.text.secondary,
   },
   errorText: {
     color: colors.error,

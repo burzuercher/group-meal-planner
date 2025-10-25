@@ -6,6 +6,7 @@ interface AppState {
   // User data
   userProfile: UserProfile | null;
   currentGroupId: string | null;
+  lastGroupSelectionTime: Date | null;
 
   // Actions
   setUserProfile: (profile: UserProfile) => Promise<void>;
@@ -18,10 +19,12 @@ interface AppState {
 
 const USER_PROFILE_KEY = '@lifegroup_food:user_profile';
 const CURRENT_GROUP_KEY = '@lifegroup_food:current_group';
+const LAST_GROUP_SELECTION_KEY = '@lifegroup_food:last_group_selection';
 
 export const useAppStore = create<AppState>((set, get) => ({
   userProfile: null,
   currentGroupId: null,
+  lastGroupSelectionTime: null,
 
   setUserProfile: async (profile: UserProfile) => {
     try {
@@ -59,8 +62,12 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setCurrentGroup: async (groupId: string) => {
     try {
-      await AsyncStorage.setItem(CURRENT_GROUP_KEY, groupId);
-      set({ currentGroupId: groupId });
+      const now = new Date();
+      await Promise.all([
+        AsyncStorage.setItem(CURRENT_GROUP_KEY, groupId),
+        AsyncStorage.setItem(LAST_GROUP_SELECTION_KEY, now.toISOString()),
+      ]);
+      set({ currentGroupId: groupId, lastGroupSelectionTime: now });
     } catch (error) {
       console.error('Error setting current group:', error);
     }
@@ -92,9 +99,10 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   loadUserProfile: async () => {
     try {
-      const [profileStr, currentGroupStr] = await Promise.all([
+      const [profileStr, currentGroupStr, lastSelectionStr] = await Promise.all([
         AsyncStorage.getItem(USER_PROFILE_KEY),
         AsyncStorage.getItem(CURRENT_GROUP_KEY),
+        AsyncStorage.getItem(LAST_GROUP_SELECTION_KEY),
       ]);
 
       if (profileStr) {
@@ -104,13 +112,21 @@ export const useAppStore = create<AppState>((set, get) => ({
         // Auto-select single group if no current group is set
         if (!currentGroupStr && profile.joinedGroups?.length === 1) {
           const singleGroupId = profile.joinedGroups[0].groupId;
-          await AsyncStorage.setItem(CURRENT_GROUP_KEY, singleGroupId);
-          set({ currentGroupId: singleGroupId });
+          const now = new Date();
+          await Promise.all([
+            AsyncStorage.setItem(CURRENT_GROUP_KEY, singleGroupId),
+            AsyncStorage.setItem(LAST_GROUP_SELECTION_KEY, now.toISOString()),
+          ]);
+          set({ currentGroupId: singleGroupId, lastGroupSelectionTime: now });
         }
       }
 
       if (currentGroupStr) {
         set({ currentGroupId: currentGroupStr });
+      }
+
+      if (lastSelectionStr) {
+        set({ lastGroupSelectionTime: new Date(lastSelectionStr) });
       }
     } catch (error) {
       console.error('Error loading user profile:', error);

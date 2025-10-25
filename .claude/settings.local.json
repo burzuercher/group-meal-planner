@@ -6,7 +6,8 @@
       "Bash(dir:*)",
       "Bash(npm install:*)",
       "Bash(npx expo install:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "mcp__ide__getDiagnostics"
     ],
     "deny": [],
     "ask": []

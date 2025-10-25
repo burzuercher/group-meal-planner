@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, StyleSheet, FlatList, Alert, RefreshControl, Platform, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, ScrollView, Alert, RefreshControl, Platform, TouchableOpacity } from 'react-native';
 import { Text, FAB, Chip, IconButton, Menu, Divider, Button, Dialog, Portal, TextInput } from 'react-native-paper';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -332,7 +332,13 @@ export default function MenuDetailsScreen() {
 
   return (
     <Screen edges={['bottom']}>
-      <View style={styles.container}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+        }
+      >
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.headerContent}>
@@ -523,31 +529,21 @@ export default function MenuDetailsScreen() {
                 ? 'All items have been reserved'
                 : "You haven't reserved any items yet"
             }
-            actionLabel={filter === 'all' ? 'Add Item' : undefined}
-            onAction={filter === 'all' ? handleAddItem : undefined}
           />
         ) : (
-          <FlatList
-            data={filteredItems}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
+          <View style={styles.list}>
+            {filteredItems.map((item) => (
               <MenuItemCard
+                key={item.id}
                 item={item}
                 reservedByProfileImage={getProfileImageByName(item.reservedBy)}
                 onReserve={() => handleToggleReservation(item)}
                 onDelete={() => handleDeleteItem(item)}
               />
-            )}
-            contentContainerStyle={styles.list}
-            refreshControl={
-              <RefreshControl
-                refreshing={refreshing}
-                onRefresh={handleRefresh}
-              />
-            }
-          />
+            ))}
+          </View>
         )}
-      </View>
+      </ScrollView>
 
       <FAB
         icon="plus"
@@ -615,6 +611,9 @@ export default function MenuDetailsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
   },
   header: {
     flexDirection: 'row',

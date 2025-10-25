@@ -241,12 +241,6 @@ function WeekMenuCard({ menu, onPress, userProfile, groupMembers }: WeekMenuCard
 
         <View style={styles.stats}>
           <View style={styles.stat}>
-            <MaterialCommunityIcons
-              name="food"
-              size={20}
-              color={colors.text.secondary}
-              style={styles.statIcon}
-            />
             <Text variant="labelLarge" style={styles.statValue}>
               {menu.items.length}
             </Text>
@@ -255,12 +249,6 @@ function WeekMenuCard({ menu, onPress, userProfile, groupMembers }: WeekMenuCard
             </Text>
           </View>
           <View style={styles.stat}>
-            <MaterialCommunityIcons
-              name="check-circle-outline"
-              size={20}
-              color={colors.available}
-              style={styles.statIcon}
-            />
             <Text
               variant="labelLarge"
               style={[styles.statValue, { color: colors.available }]}
@@ -272,12 +260,6 @@ function WeekMenuCard({ menu, onPress, userProfile, groupMembers }: WeekMenuCard
             </Text>
           </View>
           <View style={styles.stat}>
-            <MaterialCommunityIcons
-              name="account"
-              size={20}
-              color={colors.myReserved}
-              style={styles.statIcon}
-            />
             <Text
               variant="labelLarge"
               style={[styles.statValue, { color: colors.myReserved }]}
@@ -320,9 +302,9 @@ function WeekMenuCard({ menu, onPress, userProfile, groupMembers }: WeekMenuCard
                     />
                   ) : (
                     <MaterialCommunityIcons
-                      name="check-circle-outline"
+                      name="circle-outline"
                       size={20}
-                      color={colors.available}
+                      color={colors.text.disabled}
                       style={styles.itemIcon}
                     />
                   )}
@@ -408,7 +390,7 @@ const styles = StyleSheet.create({
   stats: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    paddingTop: spacing.lg,
+    paddingTop: spacing.md,
     paddingBottom: spacing.md,
     marginTop: spacing.md,
     borderTopWidth: 1,
@@ -417,9 +399,6 @@ const styles = StyleSheet.create({
   stat: {
     alignItems: 'center',
     flex: 1,
-  },
-  statIcon: {
-    marginBottom: spacing.xs,
   },
   statValue: {
     fontWeight: '700',
