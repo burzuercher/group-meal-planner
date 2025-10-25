@@ -6,5 +6,6 @@ export { default as GroupSelectorModal } from './GroupSelectorModal';
 export { default as ImageLightbox } from './ImageLightbox';
 export { default as MenuImage } from './MenuImage';
 export { default as MenuItemCard } from './MenuItemCard';
+export { default as NotificationSettingsCard } from './NotificationSettingsCard';
 export { default as PartySizeInput } from './PartySizeInput';
 export { default as Screen } from './Screen';

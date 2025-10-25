@@ -4,12 +4,32 @@ export interface PartySize {
   children: number;
 }
 
+// Notification Preferences
+export interface NotificationPreferences {
+  enabled: boolean;
+
+  // Meal reminder timing (hours before meal)
+  mealReminder24h: boolean;
+  mealReminder3h: boolean;
+  mealReminder1h: boolean;
+
+  // Item-specific notifications
+  notifyReservedItems: boolean;     // "Don't forget to bring [items]"
+  notifyUnassignedItems: boolean;   // "There are items that need bringing" (only if user hasn't reserved)
+
+  // Quiet hours
+  quietHoursEnabled: boolean;
+  quietHoursStart: string;          // "22:00" format (24h)
+  quietHoursEnd: string;            // "08:00" format (24h)
+}
+
 // User Profile (stored locally)
 export interface UserProfile {
   name: string;
   profileImageUri?: string; // Firebase Storage download URL
   partySize: PartySize;
   joinedGroups: GroupMembership[];
+  notificationPreferences?: NotificationPreferences;
 }
 
 export interface GroupMembership {

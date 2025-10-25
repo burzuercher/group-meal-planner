@@ -17,12 +17,13 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { Screen, EmptyState, Loading, Avatar, PartySizeInput } from '../../components';
+import { Screen, EmptyState, Loading, Avatar, PartySizeInput, NotificationSettingsCard } from '../../components';
 import { colors, spacing, borderRadius, elevation, gradients } from '../../theme';
 import { useAppStore } from '../../store';
 import { createGroup, joinGroup, getGroupById, updateMemberInfo } from '../../services/groupService';
 import { uploadProfileImage } from '../../services/storageService';
-import { Group, GroupMembership, RootStackParamList } from '../../types';
+import { requestNotificationPermissions, DEFAULT_NOTIFICATION_PREFERENCES } from '../../services/notificationService';
+import { Group, GroupMembership, RootStackParamList, NotificationPreferences } from '../../types';
 
 type ProfileScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -388,6 +389,32 @@ export default function ProfileScreen() {
     }
   };
 
+  const handleNotificationPreferencesChange = async (newPreferences: NotificationPreferences) => {
+    try {
+      // Request permissions if enabling notifications
+      if (newPreferences.enabled && !userProfile?.notificationPreferences?.enabled) {
+        const hasPermission = await requestNotificationPermissions();
+        if (!hasPermission) {
+          Alert.alert(
+            'Permission Required',
+            'Please enable notifications in your device settings to receive meal reminders.',
+            [{ text: 'OK' }]
+          );
+          return;
+        }
+      }
+
+      // Update local profile
+      await updateProfileInfo({ notificationPreferences: newPreferences });
+
+      // TODO: Reschedule all notifications based on new preferences
+      // This will be implemented when we integrate with menuService
+    } catch (err) {
+      console.error('Error updating notification preferences:', err);
+      Alert.alert('Error', 'Failed to update notification preferences. Please try again.');
+    }
+  };
+
   if (loading) {
     return <Loading message="Loading your groups..." />;
   }
@@ -396,132 +423,163 @@ export default function ProfileScreen() {
     return null;
   }
 
-  return (
-    <Screen edges={['bottom']}>
-      <View style={styles.container}>
-        <LinearGradient
-          colors={gradients.header.colors}
-          start={gradients.header.start}
-          end={gradients.header.end}
-          style={styles.header}
-        >
-          <View style={styles.headerContent}>
-            <TouchableOpacity onPress={handleChangePhoto} style={styles.profilePhotoContainer}>
-              <Avatar
-                imageUri={userProfile.profileImageUri}
-                name={userProfile.name}
-                size={64}
+  const renderHeader = () => (
+    <>
+      <LinearGradient
+        colors={gradients.header.colors}
+        start={gradients.header.start}
+        end={gradients.header.end}
+        style={styles.header}
+      >
+        <View style={styles.headerContent}>
+          <TouchableOpacity onPress={handleChangePhoto} style={styles.profilePhotoContainer}>
+            <Avatar
+              imageUri={userProfile.profileImageUri}
+              name={userProfile.name}
+              size={64}
+            />
+            <View style={styles.cameraIconContainer}>
+              <MaterialCommunityIcons
+                name="camera"
+                size={16}
+                color={colors.text.onPrimary}
               />
-              <View style={styles.cameraIconContainer}>
-                <MaterialCommunityIcons
-                  name="camera"
-                  size={16}
-                  color={colors.text.onPrimary}
-                />
-              </View>
+            </View>
+          </TouchableOpacity>
+
+          <View style={styles.profileInfo}>
+            <TouchableOpacity onPress={handleEditName} style={styles.nameContainer}>
+              <Text variant="titleLarge" style={styles.userName}>
+                {userProfile.name}
+              </Text>
+              <MaterialCommunityIcons
+                name="pencil"
+                size={18}
+                color={colors.text.secondary}
+                style={styles.editIcon}
+              />
             </TouchableOpacity>
 
-            <View style={styles.profileInfo}>
-              <TouchableOpacity onPress={handleEditName} style={styles.nameContainer}>
-                <Text variant="titleLarge" style={styles.userName}>
-                  {userProfile.name}
-                </Text>
-                <MaterialCommunityIcons
-                  name="pencil"
-                  size={18}
-                  color={colors.text.secondary}
-                  style={styles.editIcon}
-                />
-              </TouchableOpacity>
-
-              <TouchableOpacity onPress={handleEditPartySize} style={styles.partySizeContainer}>
-                <MaterialCommunityIcons
-                  name="account-group"
-                  size={16}
-                  color={colors.text.secondary}
-                />
-                <Text variant="bodyMedium" style={styles.partySize}>
-                  {userProfile.partySize.adults} adult{userProfile.partySize.adults !== 1 ? 's' : ''}
-                  {userProfile.partySize.children > 0 && `, ${userProfile.partySize.children} ${userProfile.partySize.children === 1 ? 'child' : 'children'}`}
-                </Text>
-                <MaterialCommunityIcons
-                  name="pencil"
-                  size={14}
-                  color={colors.text.secondary}
-                />
-              </TouchableOpacity>
-            </View>
-
-            <Menu
-              visible={menuVisible}
-              onDismiss={() => setMenuVisible(false)}
-              anchor={
-                <IconButton
-                  icon="dots-vertical"
-                  size={24}
-                  onPress={() => setMenuVisible(true)}
-                />
-              }
-            >
-              <Menu.Item
-                onPress={() => {
-                  setMenuVisible(false);
-                  handleClearData();
-                }}
-                title="Clear Data (Dev)"
-                leadingIcon="delete-sweep"
+            <TouchableOpacity onPress={handleEditPartySize} style={styles.partySizeContainer}>
+              <MaterialCommunityIcons
+                name="account-group"
+                size={16}
+                color={colors.text.secondary}
               />
-            </Menu>
+              <Text variant="bodyMedium" style={styles.partySize}>
+                {userProfile.partySize.adults} adult{userProfile.partySize.adults !== 1 ? 's' : ''}
+                {userProfile.partySize.children > 0 && `, ${userProfile.partySize.children} ${userProfile.partySize.children === 1 ? 'child' : 'children'}`}
+              </Text>
+              <MaterialCommunityIcons
+                name="pencil"
+                size={14}
+                color={colors.text.secondary}
+              />
+            </TouchableOpacity>
           </View>
-        </LinearGradient>
 
-        {groups.length === 0 ? (
-          <EmptyState
-            icon="account-group-outline"
-            title="No Groups Yet"
-            message="Create a new group or join an existing one to get started"
-            actionLabel="Create Group"
-            onAction={() => openDialog('create')}
-          />
-        ) : (
-          <>
-            <FlatList
-              data={groups}
-              keyExtractor={(item) => item.groupId}
-              renderItem={({ item }) => (
-                <GroupCard
-                  group={item}
-                  isActive={item.groupId === currentGroupId}
-                  onPress={() => setCurrentGroup(item.groupId)}
-                  onEdit={() => navigation.navigate('GroupDetails', { groupId: item.groupId })}
-                  onShare={() => shareGroupCode(item.groupName, item.code)}
-                  onRemove={() => handleRemoveGroup(item)}
-                />
-              )}
-              contentContainerStyle={styles.list}
+          <Menu
+            visible={menuVisible}
+            onDismiss={() => setMenuVisible(false)}
+            anchor={
+              <IconButton
+                icon="dots-vertical"
+                size={24}
+                onPress={() => setMenuVisible(true)}
+              />
+            }
+          >
+            <Menu.Item
+              onPress={() => {
+                setMenuVisible(false);
+                handleClearData();
+              }}
+              title="Clear Data (Dev)"
+              leadingIcon="delete-sweep"
             />
+          </Menu>
+        </View>
+      </LinearGradient>
 
-            <View style={styles.buttonContainer}>
-              <Button
-                mode="outlined"
-                onPress={() => openDialog('join')}
-                style={styles.button}
-                icon="account-plus"
-              >
-                Join Group
-              </Button>
-              <Button
-                mode="contained"
-                onPress={() => openDialog('create')}
-                style={styles.button}
-                icon="plus"
-              >
-                Create Group
-              </Button>
-            </View>
-          </>
-        )}
+      {/* Groups Section Header */}
+      {groups.length > 0 && (
+        <View style={styles.groupsHeader}>
+          <Text variant="titleMedium" style={styles.groupsSectionTitle}>
+            My Groups
+          </Text>
+        </View>
+      )}
+    </>
+  );
+
+  const renderFooter = () => (
+    <>
+      {groups.length > 0 && (
+        <View style={styles.buttonContainer}>
+          <Button
+            mode="outlined"
+            onPress={() => openDialog('join')}
+            style={styles.button}
+            icon="account-plus"
+          >
+            Join Group
+          </Button>
+          <Button
+            mode="contained"
+            onPress={() => openDialog('create')}
+            style={styles.button}
+            icon="plus"
+          >
+            Create Group
+          </Button>
+        </View>
+      )}
+
+      {/* Notification Settings */}
+      <View style={styles.notificationSection}>
+        <Text variant="titleMedium" style={styles.notificationSectionTitle}>
+          Notifications
+        </Text>
+        <NotificationSettingsCard
+          preferences={userProfile.notificationPreferences || DEFAULT_NOTIFICATION_PREFERENCES}
+          onPreferencesChange={handleNotificationPreferencesChange}
+          loading={processing}
+        />
       </View>
+    </>
+  );
+
+  const renderEmptyState = () => (
+    <EmptyState
+      icon="account-group-outline"
+      title="No Groups Yet"
+      message="Create a new group or join an existing one to get started"
+      actionLabel="Create Group"
+      onAction={() => openDialog('create')}
+    />
+  );
+
+  return (
+    <Screen edges={['bottom']}>
+      <FlatList
+        data={groups}
+        keyExtractor={(item) => item.groupId}
+        renderItem={({ item }) => (
+          <GroupCard
+            group={item}
+            isActive={item.groupId === currentGroupId}
+            onPress={() => setCurrentGroup(item.groupId)}
+            onEdit={() => navigation.navigate('GroupDetails', { groupId: item.groupId })}
+            onShare={() => shareGroupCode(item.groupName, item.code)}
+            onRemove={() => handleRemoveGroup(item)}
+          />
+        )}
+        ListHeaderComponent={renderHeader}
+        ListFooterComponent={renderFooter}
+        ListEmptyComponent={renderEmptyState}
+        contentContainerStyle={styles.listContent}
+        style={styles.container}
+      />
 
       <Portal>
         <Dialog visible={dialogVisible} onDismiss={() => setDialogVisible(false)}>
@@ -717,6 +775,10 @@ function GroupCard({ group, isActive, onPress, onEdit, onShare, onRemove }: Grou
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: colors.background,
+  },
+  listContent: {
+    flexGrow: 1,
   },
   header: {
     padding: spacing.lg,
@@ -769,10 +831,29 @@ const styles = StyleSheet.create({
   partySize: {
     color: colors.text.secondary,
   },
-  list: {
-    padding: spacing.md,
+  notificationSection: {
+    padding: spacing.lg,
+    backgroundColor: colors.background,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingBottom: spacing.xxl,
+  },
+  notificationSectionTitle: {
+    fontWeight: '600',
+    color: colors.text.primary,
+    marginBottom: spacing.md,
+  },
+  groupsHeader: {
+    padding: spacing.lg,
+    paddingBottom: spacing.sm,
+    backgroundColor: colors.background,
+  },
+  groupsSectionTitle: {
+    fontWeight: '600',
+    color: colors.text.primary,
   },
   card: {
+    marginHorizontal: spacing.md,
     marginBottom: spacing.md,
     borderRadius: borderRadius.lg,
     ...elevation.level1,

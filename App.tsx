@@ -4,10 +4,20 @@ import { AppState, AppStateStatus } from 'react-native';
 import { PaperProvider } from 'react-native-paper';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Notifications from 'expo-notifications';
 import AppNavigator from './src/navigation/AppNavigator';
 import { GroupSelectorModal } from './src/components';
 import { theme } from './src/theme';
 import { useAppStore } from './src/store';
+
+// Configure how notifications should be handled when app is in foreground
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
 
 const THREE_HOURS_IN_MS = 3 * 60 * 60 * 1000;
 
@@ -64,6 +74,26 @@ export default function App() {
       subscription.remove();
     };
   }, [userProfile, currentGroupId, lastGroupSelectionTime]);
+
+  useEffect(() => {
+    // Handle notification responses (when user taps a notification)
+    const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
+      const data = response.notification.request.content.data;
+
+      // TODO: Navigate to menu details screen when notification is tapped
+      // This will be implemented once we integrate with navigation
+      console.log('Notification tapped:', data);
+
+      // Example navigation (to be implemented):
+      // if (data.menuId) {
+      //   navigation.navigate('MenuDetails', { menuId: data.menuId, dateString: ... });
+      // }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
 
   const checkShouldShowGroupSelector = () => {
     // Only show if user has multiple groups

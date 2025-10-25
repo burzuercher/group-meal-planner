@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { UserProfile, GroupMembership, PartySize } from '../types';
+import { UserProfile, GroupMembership, PartySize, NotificationPreferences } from '../types';
 
 interface AppState {
   // User data
@@ -10,7 +10,7 @@ interface AppState {
 
   // Actions
   setUserProfile: (profile: UserProfile) => Promise<void>;
-  updateProfileInfo: (updates: { name?: string; profileImageUri?: string; partySize?: PartySize }) => Promise<void>;
+  updateProfileInfo: (updates: { name?: string; profileImageUri?: string; partySize?: PartySize; notificationPreferences?: NotificationPreferences }) => Promise<void>;
   addGroup: (group: GroupMembership) => Promise<void>;
   setCurrentGroup: (groupId: string) => Promise<void>;
   removeGroup: (groupId: string) => Promise<void>;
