@@ -7,7 +7,7 @@ import { colors } from '../theme';
 // Import screens
 import CalendarScreen from '../screens/Calendar/CalendarScreen';
 import WeekMenuScreen from '../screens/Menu/WeekMenuScreen';
-import GroupsScreen from '../screens/Groups/GroupsScreen';
+import ProfileScreen from '../screens/Groups/ProfileScreen';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
@@ -42,12 +42,12 @@ export default function TabNavigator() {
         }}
       />
       <Tab.Screen
-        name="Groups"
-        component={GroupsScreen}
+        name="Profile"
+        component={ProfileScreen}
         options={{
-          title: 'Groups',
+          title: 'Profile',
           tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="account-group" size={size} color={color} />
+            <MaterialCommunityIcons name="account-circle" size={size} color={color} />
           ),
         }}
       />

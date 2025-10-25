@@ -5,11 +5,12 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { Screen, EmptyState, Loading } from '../../components';
+import { Screen, EmptyState, Loading, Avatar } from '../../components';
 import { colors, spacing, borderRadius, elevation, gradients } from '../../theme';
 import { useAppStore } from '../../store';
 import { getMenusInRange, getMenuItems } from '../../services/menuService';
-import { Menu, MenuItem, RootStackParamList } from '../../types';
+import { getGroupById } from '../../services/groupService';
+import { Menu, MenuItem, RootStackParamList, GroupMember } from '../../types';
 import { getCurrentWeekRange, formatDate, formatDateKey } from '../../utils/dateUtils';
 
 type WeekMenuNavigationProp = StackNavigationProp<RootStackParamList>;
@@ -25,6 +26,7 @@ export default function WeekMenuScreen() {
   const { currentGroupId, userProfile } = useAppStore();
 
   const [menus, setMenus] = useState<MenuWithItems[]>([]);
+  const [groupMembers, setGroupMembers] = useState<GroupMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -48,7 +50,12 @@ export default function WeekMenuScreen() {
 
     try {
       const { start, end } = getCurrentWeekRange();
-      const weekMenus = await getMenusInRange(currentGroupId, start, end);
+      const [weekMenus, groupData] = await Promise.all([
+        getMenusInRange(currentGroupId, start, end),
+        getGroupById(currentGroupId),
+      ]);
+
+      setGroupMembers(groupData?.members || []);
 
       // Load items for each menu
       const menusWithItems = await Promise.all(
@@ -144,6 +151,7 @@ export default function WeekMenuScreen() {
                 menu={item}
                 onPress={() => handleMenuPress(item)}
                 userProfile={userProfile}
+                groupMembers={groupMembers}
               />
             )}
             contentContainerStyle={styles.list}
@@ -168,9 +176,15 @@ interface WeekMenuCardProps {
   menu: MenuWithItems;
   onPress: () => void;
   userProfile: { name: string } | null;
+  groupMembers: GroupMember[];
 }
 
-function WeekMenuCard({ menu, onPress, userProfile }: WeekMenuCardProps) {
+function WeekMenuCard({ menu, onPress, userProfile, groupMembers }: WeekMenuCardProps) {
+  const getProfileImageByName = (name: string | null): string | undefined => {
+    if (!name) return undefined;
+    return groupMembers.find(member => member.name === name)?.profileImageUri;
+  };
+
   const isActive = menu.status === 'active';
   const statusColor = isActive ? colors.menuActive : colors.menuProposed;
 
@@ -293,28 +307,23 @@ function WeekMenuCard({ menu, onPress, userProfile }: WeekMenuCardProps) {
               const isMyItem = item.reservedBy === userProfile?.name;
               const isReserved = item.reservedBy !== null;
 
-              let iconName: 'check-circle-outline' | 'account' | 'account-outline';
-              let iconColor: string;
-
-              if (!isReserved) {
-                iconName = 'check-circle-outline';
-                iconColor = colors.available;
-              } else if (isMyItem) {
-                iconName = 'account';
-                iconColor = colors.myReserved;
-              } else {
-                iconName = 'account-outline';
-                iconColor = colors.reserved;
-              }
-
               return (
                 <View key={item.id} style={styles.itemPreviewRow}>
-                  <MaterialCommunityIcons
-                    name={iconName}
-                    size={16}
-                    color={iconColor}
-                    style={styles.itemIcon}
-                  />
+                  {isReserved ? (
+                    <Avatar
+                      imageUri={getProfileImageByName(item.reservedBy)}
+                      name={item.reservedBy || ''}
+                      size={20}
+                      style={styles.itemIcon}
+                    />
+                  ) : (
+                    <MaterialCommunityIcons
+                      name="check-circle-outline"
+                      size={20}
+                      color={colors.available}
+                      style={styles.itemIcon}
+                    />
+                  )}
                   <Text variant="bodySmall" style={styles.itemPreviewText}>
                     {item.name}
                   </Text>

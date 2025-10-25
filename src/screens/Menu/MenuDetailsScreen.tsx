@@ -19,7 +19,8 @@ import {
   updateMenu,
   getMenuByDate,
 } from '../../services/menuService';
-import { Menu as MenuType, MenuItem, RootStackParamList, MenuAttendee } from '../../types';
+import { getGroupById } from '../../services/groupService';
+import { Menu as MenuType, MenuItem, RootStackParamList, MenuAttendee, GroupMember } from '../../types';
 import { formatDate, parseDateKey, formatDateKey } from '../../utils/dateUtils';
 
 type MenuDetailsRouteProp = RouteProp<RootStackParamList, 'MenuDetails'>;
@@ -32,6 +33,7 @@ export default function MenuDetailsScreen() {
 
   const [menu, setMenu] = useState<MenuType | null>(null);
   const [items, setItems] = useState<MenuItem[]>([]);
+  const [groupMembers, setGroupMembers] = useState<GroupMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [menuVisible, setMenuVisible] = useState(false);
@@ -58,13 +60,15 @@ export default function MenuDetailsScreen() {
     }
 
     try {
-      const [menuData, itemsData] = await Promise.all([
+      const [menuData, itemsData, groupData] = await Promise.all([
         getMenuById(currentGroupId, menuId),
         getMenuItems(currentGroupId, menuId),
+        getGroupById(currentGroupId),
       ]);
 
       setMenu(menuData);
       setItems(itemsData);
+      setGroupMembers(groupData?.members || []);
     } catch (error) {
       console.error('Error loading menu:', error);
       Alert.alert('Error', 'Failed to load menu details');
@@ -142,7 +146,8 @@ export default function MenuDetailsScreen() {
 
     try {
       await updateMenuStatus(currentGroupId, menuId, newStatus);
-      setMenu({ ...menu, status: newStatus });
+      // Reload menu data to get updated attendees (auto-populated on activation)
+      await loadMenuData(true);
       setMenuVisible(false);
       Alert.alert(
         'Success',
@@ -295,6 +300,11 @@ export default function MenuDetailsScreen() {
       default:
         return items;
     }
+  };
+
+  const getProfileImageByName = (name: string | null): string | undefined => {
+    if (!name) return undefined;
+    return groupMembers.find(member => member.name === name)?.profileImageUri;
   };
 
   const availableCount = items.filter((i) => !i.reservedBy).length;
@@ -523,6 +533,7 @@ export default function MenuDetailsScreen() {
             renderItem={({ item }) => (
               <MenuItemCard
                 item={item}
+                reservedByProfileImage={getProfileImageByName(item.reservedBy)}
                 onReserve={() => handleToggleReservation(item)}
                 onDelete={() => handleDeleteItem(item)}
               />

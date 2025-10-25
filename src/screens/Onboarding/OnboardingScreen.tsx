@@ -24,7 +24,7 @@ export default function OnboardingScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const { setUserProfile, addGroup } = useAppStore();
+  const { setUserProfile, addGroup, setCurrentGroup } = useAppStore();
 
   const handleNameNext = () => {
     if (name.trim().length < 2) {
@@ -116,7 +116,8 @@ export default function OnboardingScreen() {
         ],
       });
 
-      // Group will be set as current group automatically via addGroup
+      // Set the created group as the current group
+      await setCurrentGroup(group.id);
     } catch (err) {
       console.error('Error creating group:', err);
       setError('Failed to create group. Please try again.');
@@ -170,6 +171,9 @@ export default function OnboardingScreen() {
           },
         ],
       });
+
+      // Set the joined group as the current group
+      await setCurrentGroup(group.id);
     } catch (err) {
       console.error('Error joining group:', err);
       if (err instanceof Error && err.message === 'Group not found') {

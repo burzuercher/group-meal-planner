@@ -9,7 +9,7 @@ interface AppState {
 
   // Actions
   setUserProfile: (profile: UserProfile) => Promise<void>;
-  updateProfileInfo: (updates: { profileImageUri?: string; partySize?: PartySize }) => Promise<void>;
+  updateProfileInfo: (updates: { name?: string; profileImageUri?: string; partySize?: PartySize }) => Promise<void>;
   addGroup: (group: GroupMembership) => Promise<void>;
   setCurrentGroup: (groupId: string) => Promise<void>;
   removeGroup: (groupId: string) => Promise<void>;

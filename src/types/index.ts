@@ -104,5 +104,5 @@ export type RootStackParamList = {
 export type MainTabParamList = {
   WeekMenu: undefined;
   Calendar: undefined;
-  Groups: undefined;
+  Profile: undefined;
 };

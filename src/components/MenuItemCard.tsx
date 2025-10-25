@@ -9,6 +9,7 @@ import Avatar from './Avatar';
 
 interface MenuItemCardProps {
   item: MenuItem;
+  reservedByProfileImage?: string; // Profile image URI of the person who reserved this item
   onPress?: () => void;
   onReserve?: () => void;
   onDelete?: () => void;
@@ -16,6 +17,7 @@ interface MenuItemCardProps {
 
 export default function MenuItemCard({
   item,
+  reservedByProfileImage,
   onPress,
   onReserve,
   onDelete,
@@ -102,6 +104,7 @@ export default function MenuItemCard({
             <View style={styles.statusContainer}>
               {!isAvailable && item.reservedBy && (
                 <Avatar
+                  imageUri={reservedByProfileImage}
                   name={item.reservedBy}
                   size={24}
                   style={styles.statusAvatar}
@@ -160,11 +163,11 @@ const styles = StyleSheet.create({
   categoryChip: {
     alignSelf: 'flex-start',
     backgroundColor: colors.primaryContainer,
-    height: 24,
   },
   categoryText: {
     fontSize: 11,
     fontWeight: '500',
+    lineHeight: 16,
   },
   headerActions: {
     flexDirection: 'row',

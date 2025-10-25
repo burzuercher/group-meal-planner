@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, FlatList, Alert, Share } from 'react-native';
+import { View, StyleSheet, FlatList, Alert, Share, TouchableOpacity } from 'react-native';
 import {
   Text,
   Card,
@@ -12,16 +12,18 @@ import {
   Menu,
 } from 'react-native-paper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as ImagePicker from 'expo-image-picker';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Screen, EmptyState, Loading } from '../../components';
+import { Screen, EmptyState, Loading, Avatar, PartySizeInput } from '../../components';
 import { colors, spacing, borderRadius, elevation, gradients } from '../../theme';
 import { useAppStore } from '../../store';
-import { createGroup, joinGroup, getGroupById } from '../../services/groupService';
+import { createGroup, joinGroup, getGroupById, updateMemberInfo } from '../../services/groupService';
+import { uploadProfileImage } from '../../services/storageService';
 import { Group, GroupMembership } from '../../types';
 
-export default function GroupsScreen() {
-  const { userProfile, currentGroupId, addGroup, setCurrentGroup, removeGroup } =
+export default function ProfileScreen() {
+  const { userProfile, currentGroupId, addGroup, setCurrentGroup, removeGroup, updateProfileInfo } =
     useAppStore();
 
   const [groups, setGroups] = useState<(GroupMembership & { memberCount: number })[]>(
@@ -36,9 +38,37 @@ export default function GroupsScreen() {
   const [error, setError] = useState('');
   const [menuVisible, setMenuVisible] = useState(false);
 
+  // Profile editing state
+  const [editNameVisible, setEditNameVisible] = useState(false);
+  const [editPartySizeVisible, setEditPartySizeVisible] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [newAdults, setNewAdults] = useState(1);
+  const [newChildren, setNewChildren] = useState(0);
+
   useEffect(() => {
     loadGroups();
+    syncProfileToGroups();
   }, [userProfile]);
+
+  const syncProfileToGroups = async () => {
+    // Sync current profile data to all Firestore groups
+    // This ensures Firestore has the latest party size and profile image
+    if (!userProfile?.joinedGroups) return;
+
+    try {
+      await Promise.allSettled(
+        userProfile.joinedGroups.map((group) =>
+          updateMemberInfo(group.groupId, userProfile.name, {
+            partySize: userProfile.partySize,
+            ...(userProfile.profileImageUri && { profileImageUri: userProfile.profileImageUri }),
+          })
+        )
+      );
+    } catch (error) {
+      console.error('Error syncing profile to groups:', error);
+      // Fail silently - this is a background sync
+    }
+  };
 
   const loadGroups = async () => {
     if (!userProfile?.joinedGroups) {
@@ -233,6 +263,126 @@ export default function GroupsScreen() {
     setDialogVisible(true);
   };
 
+  // Profile editing handlers
+  const handleEditName = () => {
+    if (!userProfile) return;
+    setNewName(userProfile.name);
+    setEditNameVisible(true);
+  };
+
+  const handleSaveName = async () => {
+    if (newName.trim().length < 2) {
+      setError('Please enter a name (at least 2 characters)');
+      return;
+    }
+
+    setProcessing(true);
+    setError('');
+
+    try {
+      await updateProfileInfo({ name: newName.trim() });
+      setEditNameVisible(false);
+      Alert.alert('Success', 'Your name has been updated');
+    } catch (err) {
+      console.error('Error updating name:', err);
+      setError('Failed to update name. Please try again.');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleChangePhoto = async () => {
+    if (!userProfile) return;
+
+    try {
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+      if (!permissionResult.granted) {
+        Alert.alert('Permission required', 'Please allow access to your photos to change your profile image.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.7,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setProcessing(true);
+
+        try {
+          const userId = `${userProfile.name}_${Date.now()}`;
+          const uploadedImageUri = await uploadProfileImage(userId, result.assets[0].uri);
+
+          // Update local profile
+          await updateProfileInfo({ profileImageUri: uploadedImageUri });
+
+          // Sync to all groups in Firestore
+          if (userProfile?.joinedGroups) {
+            await Promise.allSettled(
+              userProfile.joinedGroups.map((group) =>
+                updateMemberInfo(group.groupId, userProfile.name, { profileImageUri: uploadedImageUri })
+              )
+            );
+          }
+
+          Alert.alert('Success', 'Your profile photo has been updated');
+        } catch (uploadError) {
+          console.error('Failed to upload profile image:', uploadError);
+          Alert.alert('Error', 'Failed to update profile photo. Please try again.');
+        } finally {
+          setProcessing(false);
+        }
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      Alert.alert('Error', 'Failed to pick image. Please try again.');
+    }
+  };
+
+  const handleEditPartySize = () => {
+    if (!userProfile) return;
+    setNewAdults(userProfile.partySize.adults);
+    setNewChildren(userProfile.partySize.children);
+    setEditPartySizeVisible(true);
+  };
+
+  const handleSavePartySize = async () => {
+    if (newAdults < 1) {
+      setError('You must have at least 1 adult');
+      return;
+    }
+
+    setProcessing(true);
+    setError('');
+
+    try {
+      const newPartySize = { adults: newAdults, children: newChildren };
+
+      // Update local profile
+      await updateProfileInfo({ partySize: newPartySize });
+
+      // Sync to all groups in Firestore
+      if (userProfile?.joinedGroups) {
+        await Promise.allSettled(
+          userProfile.joinedGroups.map((group) =>
+            updateMemberInfo(group.groupId, userProfile.name, { partySize: newPartySize })
+          )
+        );
+      }
+
+      setEditPartySizeVisible(false);
+      Alert.alert('Success', 'Your party size has been updated');
+    } catch (err) {
+      console.error('Error updating party size:', err);
+      setError('Failed to update party size. Please try again.');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
   if (loading) {
     return <Loading message="Loading your groups..." />;
   }
@@ -251,14 +401,52 @@ export default function GroupsScreen() {
           style={styles.header}
         >
           <View style={styles.headerContent}>
-            <View>
-              <Text variant="bodyMedium" style={styles.greeting}>
-                Signed in as
-              </Text>
-              <Text variant="titleLarge" style={styles.userName}>
-                {userProfile.name}
-              </Text>
+            <TouchableOpacity onPress={handleChangePhoto} style={styles.profilePhotoContainer}>
+              <Avatar
+                imageUri={userProfile.profileImageUri}
+                name={userProfile.name}
+                size={64}
+              />
+              <View style={styles.cameraIconContainer}>
+                <MaterialCommunityIcons
+                  name="camera"
+                  size={16}
+                  color={colors.text.onPrimary}
+                />
+              </View>
+            </TouchableOpacity>
+
+            <View style={styles.profileInfo}>
+              <TouchableOpacity onPress={handleEditName} style={styles.nameContainer}>
+                <Text variant="titleLarge" style={styles.userName}>
+                  {userProfile.name}
+                </Text>
+                <MaterialCommunityIcons
+                  name="pencil"
+                  size={18}
+                  color={colors.text.secondary}
+                  style={styles.editIcon}
+                />
+              </TouchableOpacity>
+
+              <TouchableOpacity onPress={handleEditPartySize} style={styles.partySizeContainer}>
+                <MaterialCommunityIcons
+                  name="account-group"
+                  size={16}
+                  color={colors.text.secondary}
+                />
+                <Text variant="bodyMedium" style={styles.partySize}>
+                  {userProfile.partySize.adults} adult{userProfile.partySize.adults !== 1 ? 's' : ''}
+                  {userProfile.partySize.children > 0 && `, ${userProfile.partySize.children} ${userProfile.partySize.children === 1 ? 'child' : 'children'}`}
+                </Text>
+                <MaterialCommunityIcons
+                  name="pencil"
+                  size={14}
+                  color={colors.text.secondary}
+                />
+              </TouchableOpacity>
             </View>
+
             <Menu
               visible={menuVisible}
               onDismiss={() => setMenuVisible(false)}
@@ -391,6 +579,65 @@ export default function GroupsScreen() {
             </Button>
           </Dialog.Actions>
         </Dialog>
+
+        {/* Edit Name Dialog */}
+        <Dialog visible={editNameVisible} onDismiss={() => setEditNameVisible(false)}>
+          <Dialog.Title>Edit Your Name</Dialog.Title>
+          <Dialog.Content>
+            <TextInput
+              mode="outlined"
+              label="Your Name"
+              value={newName}
+              onChangeText={(text) => {
+                setNewName(text);
+                setError('');
+              }}
+              autoCapitalize="words"
+              autoCorrect={false}
+              error={!!error}
+              disabled={processing}
+            />
+            {error && <Text style={styles.errorText}>{error}</Text>}
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setEditNameVisible(false)} disabled={processing}>
+              Cancel
+            </Button>
+            <Button
+              onPress={handleSaveName}
+              loading={processing}
+              disabled={processing}
+            >
+              Save
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
+
+        {/* Edit Party Size Dialog */}
+        <Dialog visible={editPartySizeVisible} onDismiss={() => setEditPartySizeVisible(false)}>
+          <Dialog.Title>Edit Party Size</Dialog.Title>
+          <Dialog.Content>
+            <PartySizeInput
+              adults={newAdults}
+              children={newChildren}
+              onAdultsChange={setNewAdults}
+              onChildrenChange={setNewChildren}
+            />
+            {error && <Text style={styles.errorText}>{error}</Text>}
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setEditPartySizeVisible(false)} disabled={processing}>
+              Cancel
+            </Button>
+            <Button
+              onPress={handleSavePartySize}
+              loading={processing}
+              disabled={processing}
+            >
+              Save
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
       </Portal>
     </Screen>
   );
@@ -471,16 +718,48 @@ const styles = StyleSheet.create({
   },
   headerContent: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    gap: spacing.md,
   },
-  greeting: {
-    color: colors.text.secondary,
+  profilePhotoContainer: {
+    position: 'relative',
+  },
+  cameraIconContainer: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    backgroundColor: colors.primary,
+    borderRadius: 12,
+    width: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: colors.surface,
+  },
+  profileInfo: {
+    flex: 1,
+  },
+  nameContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
   },
   userName: {
     fontWeight: '600',
     color: colors.text.primary,
+  },
+  editIcon: {
+    marginLeft: spacing.xs,
+  },
+  partySizeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
     marginTop: spacing.xs,
+  },
+  partySize: {
+    color: colors.text.secondary,
   },
   list: {
     padding: spacing.md,
@@ -511,12 +790,12 @@ const styles = StyleSheet.create({
   },
   activeChip: {
     backgroundColor: colors.primary,
-    height: 24,
   },
   activeChipText: {
     fontSize: 11,
     color: colors.text.onPrimary,
     fontWeight: '600',
+    lineHeight: 16,
   },
   cardActions: {
     flexDirection: 'row',
