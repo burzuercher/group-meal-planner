@@ -5,7 +5,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { Screen, EmptyState, Loading, Avatar } from '../../components';
+import { Screen, EmptyState, Loading, Avatar, MenuImage, ImageLightbox } from '../../components';
 import { colors, spacing, borderRadius, elevation, gradients } from '../../theme';
 import { useAppStore } from '../../store';
 import { getMenusInRange, getMenuItems } from '../../services/menuService';
@@ -31,11 +31,28 @@ export default function WeekMenuScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
+  // Image lightbox state
+  const [lightboxImageUrl, setLightboxImageUrl] = useState<string | null>(null);
+  const [lightboxTitle, setLightboxTitle] = useState<string>('');
+
   useFocusEffect(
     React.useCallback(() => {
       loadUpcomingMenus();
     }, [currentGroupId])
   );
+
+  // Poll for image updates if any menu is generating
+  useEffect(() => {
+    const hasGeneratingImages = menus.some((menu) => menu.imageGenerating);
+
+    if (!hasGeneratingImages || !currentGroupId) return;
+
+    const pollInterval = setInterval(() => {
+      loadUpcomingMenus(true);
+    }, 3000); // Poll every 3 seconds
+
+    return () => clearInterval(pollInterval);
+  }, [menus, currentGroupId]);
 
   const loadUpcomingMenus = async (isRefresh = false) => {
     if (!currentGroupId) {
@@ -152,6 +169,10 @@ export default function WeekMenuScreen() {
               <WeekMenuCard
                 menu={item}
                 onPress={() => handleMenuPress(item)}
+                onImagePress={() => {
+                  setLightboxImageUrl(item.imageUrl || null);
+                  setLightboxTitle(item.name);
+                }}
                 userProfile={userProfile}
                 groupMembers={groupMembers}
               />
@@ -170,6 +191,14 @@ export default function WeekMenuScreen() {
         onPress={handleProposeMenu}
         label="Propose Menu"
       />
+
+      {/* Image Lightbox */}
+      <ImageLightbox
+        visible={!!lightboxImageUrl}
+        imageUrl={lightboxImageUrl}
+        onClose={() => setLightboxImageUrl(null)}
+        title={lightboxTitle}
+      />
     </Screen>
   );
 }
@@ -177,11 +206,12 @@ export default function WeekMenuScreen() {
 interface WeekMenuCardProps {
   menu: MenuWithItems;
   onPress: () => void;
+  onImagePress: () => void;
   userProfile: { name: string } | null;
   groupMembers: GroupMember[];
 }
 
-function WeekMenuCard({ menu, onPress, userProfile, groupMembers }: WeekMenuCardProps) {
+function WeekMenuCard({ menu, onPress, onImagePress, userProfile, groupMembers }: WeekMenuCardProps) {
   const getProfileImageByName = (name: string | null): string | undefined => {
     if (!name) return undefined;
     return groupMembers.find(member => member.name === name)?.profileImageUri;
@@ -202,42 +232,53 @@ function WeekMenuCard({ menu, onPress, userProfile, groupMembers }: WeekMenuCard
       onPress={onPress}
     >
       <Card.Content>
-        <View style={styles.cardHeader}>
-          <View style={styles.cardTitleContainer}>
-            <View style={styles.titleSection}>
-              <Text variant="titleLarge" style={styles.menuName}>
-                {menu.name}
-              </Text>
-              <Text variant="bodyMedium" style={styles.cardTitle}>
-                {formatDate(menu.date, 'EEEE, MMM d')}
-              </Text>
+        <View style={styles.cardTop}>
+          <MenuImage
+            imageUrl={menu.imageUrl}
+            isGenerating={menu.imageGenerating}
+            title={menu.name}
+            size="small"
+            style={styles.menuImage}
+            onPress={onImagePress}
+          />
+
+          <View style={styles.cardContent}>
+            <View style={styles.cardHeader}>
+              <View style={styles.titleSection}>
+                <Text variant="titleLarge" style={styles.menuName}>
+                  {menu.name}
+                </Text>
+                <Text variant="bodyMedium" style={styles.cardTitle}>
+                  {formatDate(menu.date, 'EEEE, MMM d')}
+                </Text>
+              </View>
+              <Chip
+                style={[
+                  styles.statusChip,
+                  {
+                    backgroundColor:
+                      menu.status === 'active'
+                        ? colors.menuActiveContainer
+                        : colors.menuProposedContainer,
+                  },
+                ]}
+                textStyle={{
+                  color: menu.status === 'active'
+                    ? colors.menuActive
+                    : colors.menuProposed,
+                  fontWeight: '500',
+                }}
+                compact
+              >
+                {menu.status === 'active' ? 'Active' : 'Proposed'}
+              </Chip>
             </View>
-            <Chip
-              style={[
-                styles.statusChip,
-                {
-                  backgroundColor:
-                    menu.status === 'active'
-                      ? colors.menuActiveContainer
-                      : colors.menuProposedContainer,
-                },
-              ]}
-              textStyle={{
-                color: menu.status === 'active'
-                  ? colors.menuActive
-                  : colors.menuProposed,
-                fontWeight: '500',
-              }}
-              compact
-            >
-              {menu.status === 'active' ? 'Active' : 'Proposed'}
-            </Chip>
+
+            <Text variant="bodySmall" style={styles.proposedBy}>
+              Proposed by {menu.proposedBy}
+            </Text>
           </View>
         </View>
-
-        <Text variant="bodySmall" style={styles.proposedBy}>
-          Proposed by {menu.proposedBy}
-        </Text>
 
         <View style={styles.stats}>
           <View style={styles.stat}>
@@ -355,13 +396,23 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     ...elevation.level1,
   },
-  cardHeader: {
-    marginBottom: spacing.sm,
+  cardTop: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.md,
+    marginBottom: spacing.md,
   },
-  cardTitleContainer: {
+  menuImage: {
+    flexShrink: 0,
+  },
+  cardContent: {
+    flex: 1,
+  },
+  cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
+    marginBottom: spacing.xs,
   },
   titleSection: {
     flex: 1,

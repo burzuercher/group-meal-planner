@@ -5,7 +5,7 @@ import { Calendar, DateData } from 'react-native-calendars';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { Screen, EmptyState } from '../../components';
+import { Screen, EmptyState, MenuImage } from '../../components';
 import { colors, spacing, borderRadius, elevation, gradients } from '../../theme';
 import { useAppStore } from '../../store';
 import { getMenusInRange } from '../../services/menuService';
@@ -64,6 +64,31 @@ export default function CalendarScreen() {
     await loadMenus(true);
     setRefreshing(false);
   };
+
+  // Poll for image updates on selected menu
+  useEffect(() => {
+    const selectedMenu = menus.find(
+      (menu) => formatDateKey(menu.date) === selectedDate
+    );
+
+    if (!selectedMenu?.imageGenerating || !currentGroupId) return;
+
+    const pollInterval = setInterval(async () => {
+      try {
+        const updatedMenu = await getMenusInRange(
+          currentGroupId,
+          startOfMonth(addMonths(currentMonth, -1)),
+          endOfMonth(addMonths(currentMonth, 1))
+        );
+        setMenus(updatedMenu);
+        updateMarkedDates(updatedMenu);
+      } catch (error) {
+        console.error('Error polling for image updates:', error);
+      }
+    }, 3000); // Poll every 3 seconds
+
+    return () => clearInterval(pollInterval);
+  }, [menus, selectedDate, currentGroupId, currentMonth]);
 
   const updateMarkedDates = (menuList: Menu[], newSelectedDate?: string) => {
     const marked: any = {};
@@ -187,43 +212,52 @@ export default function CalendarScreen() {
               <ActivityIndicator style={styles.loader} />
             ) : selectedMenu ? (
               <View style={styles.menuInfo}>
-                <View style={styles.menuHeader}>
-                  <Chip
-                    style={[
-                      styles.statusChip,
-                      {
-                        backgroundColor:
-                          selectedMenu.status === 'active'
-                            ? colors.menuActiveContainer
-                            : colors.menuProposedContainer,
-                      },
-                    ]}
-                    textStyle={{
-                      color: selectedMenu.status === 'active'
-                        ? colors.menuActive
-                        : colors.menuProposed,
-                      fontWeight: '500',
-                    }}
-                    compact
+                <MenuImage
+                  imageUrl={selectedMenu.imageUrl}
+                  isGenerating={selectedMenu.imageGenerating}
+                  title={selectedMenu.name}
+                  size="small"
+                  style={styles.menuImage}
+                />
+                <View style={styles.menuDetails}>
+                  <View style={styles.menuHeader}>
+                    <Chip
+                      style={[
+                        styles.statusChip,
+                        {
+                          backgroundColor:
+                            selectedMenu.status === 'active'
+                              ? colors.menuActiveContainer
+                              : colors.menuProposedContainer,
+                        },
+                      ]}
+                      textStyle={{
+                        color: selectedMenu.status === 'active'
+                          ? colors.menuActive
+                          : colors.menuProposed,
+                        fontWeight: '500',
+                      }}
+                      compact
+                    >
+                      {selectedMenu.status === 'active' ? 'Active' : 'Proposed'}
+                    </Chip>
+                  </View>
+                  <Text variant="bodyMedium" style={styles.proposedBy}>
+                    Proposed by {selectedMenu.proposedBy}
+                  </Text>
+                  <Text
+                    variant="bodySmall"
+                    style={styles.tapToView}
+                    onPress={() =>
+                      navigation.navigate('MenuDetails', {
+                        menuId: selectedMenu.id,
+                        dateString: formatDateKey(selectedMenu.date),
+                      })
+                    }
                   >
-                    {selectedMenu.status === 'active' ? 'Active' : 'Proposed'}
-                  </Chip>
+                    Tap to view menu details →
+                  </Text>
                 </View>
-                <Text variant="bodyMedium" style={styles.proposedBy}>
-                  Proposed by {selectedMenu.proposedBy}
-                </Text>
-                <Text
-                  variant="bodySmall"
-                  style={styles.tapToView}
-                  onPress={() =>
-                    navigation.navigate('MenuDetails', {
-                      menuId: selectedMenu.id,
-                      dateString: formatDateKey(selectedMenu.date),
-                    })
-                  }
-                >
-                  Tap to view menu details →
-                </Text>
               </View>
             ) : (
               <View style={styles.noMenu}>
@@ -295,6 +329,14 @@ const styles = StyleSheet.create({
     marginVertical: spacing.md,
   },
   menuInfo: {
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
+  menuImage: {
+    flexShrink: 0,
+  },
+  menuDetails: {
+    flex: 1,
     gap: spacing.sm,
   },
   menuHeader: {

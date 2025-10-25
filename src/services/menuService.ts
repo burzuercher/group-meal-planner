@@ -15,6 +15,7 @@ import { db } from './firebase';
 import { Menu, MenuItem, MenuAttendee } from '../types';
 import { startOfDay, endOfDay } from 'date-fns';
 import { getGroupById } from './groupService';
+import { generateAndCacheMenuImage } from './imageService';
 
 /**
  * Helper: Migrates old string[] attendees to MenuAttendee[]
@@ -40,6 +41,7 @@ function migrateAttendees(attendees: any): MenuAttendee[] {
 
 /**
  * Creates a new menu for a specific date
+ * Triggers background image generation
  */
 export async function createMenu(
   groupId: string,
@@ -56,22 +58,77 @@ export async function createMenu(
       proposedBy,
       status: 'proposed',
       attendees: [],
+      imageGenerating: true,
       createdAt: new Date(),
     };
 
-    await setDoc(menuRef, {
+    // Don't include imageUrl in Firestore write if undefined (Firestore doesn't support undefined)
+    const firestoreData: any = {
       ...menuData,
       date: Timestamp.fromDate(menuData.date),
       createdAt: Timestamp.fromDate(menuData.createdAt),
-    });
+    };
 
-    return {
+    await setDoc(menuRef, firestoreData);
+
+    const menu: Menu = {
       id: menuRef.id,
       ...menuData,
     };
+
+    // Generate image in background (don't await)
+    generateMenuImageInBackground(groupId, menuRef.id, name);
+
+    return menu;
   } catch (error) {
     console.error('Error creating menu:', error);
     throw new Error('Failed to create menu');
+  }
+}
+
+/**
+ * Generates menu image in background without blocking
+ */
+async function generateMenuImageInBackground(
+  groupId: string,
+  menuId: string,
+  menuName: string
+): Promise<void> {
+  try {
+    const imageUrl = await generateAndCacheMenuImage(menuName);
+
+    // Update menu with generated image URL
+    await updateMenuImage(groupId, menuId, imageUrl);
+  } catch (error) {
+    console.error('Background image generation failed:', error);
+
+    // Still update menu to stop showing loading state
+    await updateMenuImage(groupId, menuId, null);
+  }
+}
+
+/**
+ * Updates a menu's image URL and clears the generating flag
+ */
+export async function updateMenuImage(
+  groupId: string,
+  menuId: string,
+  imageUrl: string | null
+): Promise<void> {
+  try {
+    const menuRef = doc(db, `groups/${groupId}/menus`, menuId);
+    const updateData: any = {
+      imageGenerating: false,
+    };
+
+    if (imageUrl) {
+      updateData.imageUrl = imageUrl;
+    }
+
+    await updateDoc(menuRef, updateData);
+    console.log(`Updated menu ${menuId} with image:`, imageUrl ? 'success' : 'failed');
+  } catch (error) {
+    console.error('Error updating menu image:', error);
   }
 }
 
@@ -99,6 +156,8 @@ export async function getMenuById(
       proposedBy: data.proposedBy,
       status: data.status,
       attendees: migrateAttendees(data.attendees || []),
+      imageUrl: data.imageUrl,
+      imageGenerating: data.imageGenerating || false,
       createdAt: data.createdAt.toDate(),
     };
   } catch (error) {
@@ -135,6 +194,8 @@ export async function getMenusInRange(
         proposedBy: data.proposedBy,
         status: data.status,
         attendees: migrateAttendees(data.attendees || []),
+        imageUrl: data.imageUrl,
+        imageGenerating: data.imageGenerating || false,
         createdAt: data.createdAt.toDate(),
       };
     });
@@ -179,6 +240,8 @@ export async function getMenuByDate(
       proposedBy: data.proposedBy,
       status: data.status,
       attendees: migrateAttendees(data.attendees || []),
+      imageUrl: data.imageUrl,
+      imageGenerating: data.imageGenerating || false,
       createdAt: data.createdAt.toDate(),
     };
   } catch (error) {

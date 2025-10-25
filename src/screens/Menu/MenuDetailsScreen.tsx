@@ -5,7 +5,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { RouteProp, useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { Screen, Loading, EmptyState, MenuItemCard, AttendanceEditor, Avatar } from '../../components';
+import { Screen, Loading, EmptyState, MenuItemCard, AttendanceEditor, Avatar, MenuImage, ImageLightbox } from '../../components';
 import { colors, spacing, borderRadius, elevation } from '../../theme';
 import { useAppStore } from '../../store';
 import {
@@ -49,6 +49,9 @@ export default function MenuDetailsScreen() {
   const [showAttendanceEditor, setShowAttendanceEditor] = useState(false);
   const [savingAttendance, setSavingAttendance] = useState(false);
 
+  // Image lightbox state
+  const [showImageLightbox, setShowImageLightbox] = useState(false);
+
   const { menuId, dateString} = route.params;
   const date = parseDateKey(dateString);
 
@@ -84,6 +87,26 @@ export default function MenuDetailsScreen() {
       loadMenuData();
     }, [loadMenuData])
   );
+
+  // Poll for image updates while generating
+  useEffect(() => {
+    if (!menu?.imageGenerating || !currentGroupId) return;
+
+    const pollInterval = setInterval(async () => {
+      try {
+        const updatedMenu = await getMenuById(currentGroupId, menuId);
+        if (updatedMenu && !updatedMenu.imageGenerating) {
+          // Image generation complete, update state
+          setMenu(updatedMenu);
+          clearInterval(pollInterval);
+        }
+      } catch (error) {
+        console.error('Error polling for image updates:', error);
+      }
+    }, 3000); // Poll every 3 seconds
+
+    return () => clearInterval(pollInterval);
+  }, [menu?.imageGenerating, currentGroupId, menuId]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -341,19 +364,30 @@ export default function MenuDetailsScreen() {
       >
         {/* Header */}
         <View style={styles.header}>
-          <View style={styles.headerContent}>
-            <Text variant="headlineSmall" style={styles.headerTitle}>
-              {menu.name}
-            </Text>
-            <View style={styles.headerSubtitle}>
-              <Text variant="bodyMedium" style={styles.dateText}>
-                {formatDate(menu.date, 'EEEE, MMM d, yyyy')}
+          <View style={styles.headerTop}>
+            <MenuImage
+              imageUrl={menu.imageUrl}
+              isGenerating={menu.imageGenerating}
+              title={menu.name}
+              size="small"
+              style={styles.headerImage}
+              onPress={() => setShowImageLightbox(true)}
+            />
+            <View style={styles.headerContent}>
+              <Text variant="headlineSmall" style={styles.headerTitle}>
+                {menu.name}
               </Text>
-              <Text variant="bodySmall" style={styles.proposedBy}>
-                Proposed by {menu.proposedBy}
-              </Text>
+              <View style={styles.headerSubtitle}>
+                <Text variant="bodyMedium" style={styles.dateText}>
+                  {formatDate(menu.date, 'EEEE, MMM d, yyyy')}
+                </Text>
+                <Text variant="bodySmall" style={styles.proposedBy}>
+                  Proposed by {menu.proposedBy}
+                </Text>
+              </View>
             </View>
           </View>
+
           <View style={styles.headerActions}>
             {menu.status === 'proposed' ? (
               <Button
@@ -604,6 +638,14 @@ export default function MenuDetailsScreen() {
           </Dialog.Actions>
         </Dialog>
       </Portal>
+
+      {/* Image Lightbox */}
+      <ImageLightbox
+        visible={showImageLightbox}
+        imageUrl={menu.imageUrl}
+        onClose={() => setShowImageLightbox(false)}
+        title={menu.name}
+      />
     </Screen>
   );
 }
@@ -616,13 +658,19 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
     padding: spacing.lg,
     backgroundColor: colors.surface,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
+  },
+  headerTop: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.md,
+    marginBottom: spacing.md,
+  },
+  headerImage: {
+    flexShrink: 0,
   },
   headerContent: {
     flex: 1,
@@ -645,6 +693,7 @@ const styles = StyleSheet.create({
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     gap: spacing.xs,
   },
   activateButton: {

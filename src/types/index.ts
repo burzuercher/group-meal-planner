@@ -53,6 +53,8 @@ export interface Menu {
   proposedBy: string; // Name of person who proposed
   status: 'proposed' | 'active'; // proposed = pending, active = confirmed
   attendees: MenuAttendee[]; // Array of attendees with party size (was string[] for backward compatibility)
+  imageUrl?: string; // AI-generated menu image URL from Firebase Storage
+  imageGenerating?: boolean; // True while image is being generated
   createdAt: Date;
 }
 

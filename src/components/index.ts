@@ -3,6 +3,8 @@ export { default as Avatar } from './Avatar';
 export { default as Loading } from './Loading';
 export { default as EmptyState } from './EmptyState';
 export { default as GroupSelectorModal } from './GroupSelectorModal';
+export { default as ImageLightbox } from './ImageLightbox';
+export { default as MenuImage } from './MenuImage';
 export { default as MenuItemCard } from './MenuItemCard';
 export { default as PartySizeInput } from './PartySizeInput';
 export { default as Screen } from './Screen';
