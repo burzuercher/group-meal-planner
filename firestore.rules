@@ -1,0 +1,68 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper function: Check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Helper function: Check if user is a member of the group
+    function isMemberOfGroup(groupId) {
+      return isAuthenticated() &&
+             request.auth.uid in get(/databases/$(database)/documents/groups/$(groupId)).data.memberIds;
+    }
+
+    // Groups collection
+    match /groups/{groupId} {
+      // Anyone authenticated can create a group (they become the first member)
+      allow create: if isAuthenticated() &&
+                      request.resource.data.memberIds[0] == request.auth.uid;
+
+      // Members can read their group data
+      allow read: if isMemberOfGroup(groupId);
+
+      // Members can update group (for joining, editing name, etc.)
+      allow update: if isMemberOfGroup(groupId);
+
+      // No one can delete groups (prevent accidental deletion)
+      // If you want to allow deletion, add a Cloud Function for it
+      allow delete: if false;
+
+      // Menus subcollection
+      match /menus/{menuId} {
+        // Members can read all menus in their group
+        allow read: if isMemberOfGroup(groupId);
+
+        // Members can create menus in their group
+        allow create: if isMemberOfGroup(groupId);
+
+        // Members can update menus in their group
+        allow update: if isMemberOfGroup(groupId);
+
+        // Members can delete menus they created
+        allow delete: if isMemberOfGroup(groupId);
+
+        // Menu items subcollection
+        match /items/{itemId} {
+          // Members can read all items in menus in their group
+          allow read: if isMemberOfGroup(groupId);
+
+          // Members can create items in menus in their group
+          allow create: if isMemberOfGroup(groupId);
+
+          // Members can update items in menus in their group
+          allow update: if isMemberOfGroup(groupId);
+
+          // Members can delete items in menus in their group
+          allow delete: if isMemberOfGroup(groupId);
+        }
+      }
+    }
+
+    // Deny all other access
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
