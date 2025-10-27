@@ -319,6 +319,164 @@ async function uploadImageToStorage(
  * 6. Caches the result
  * 7. Tracks budget usage
  */
+/**
+ * Cloud Function: Delete User Account and All Associated Data
+ *
+ * GDPR/CCPA Compliance - Handles complete account deletion:
+ * 1. Removes user from all groups
+ * 2. Anonymizes menu proposals
+ * 3. Releases item reservations
+ * 4. Deletes profile photos from Storage
+ */
+export const deleteUserAccount = functions.https.onCall(
+  {
+    region: 'us-central1',
+    memory: '512MiB',
+    timeoutSeconds: 120,
+  },
+  async (request): Promise<{ success: boolean; message: string }> => {
+    // Validate authentication
+    if (!request.auth) {
+      throw new functions.https.HttpsError(
+        'unauthenticated',
+        'User must be authenticated to delete account'
+      );
+    }
+
+    const userId = request.auth.uid;
+    functions.logger.info(`Account deletion requested for user: ${userId}`);
+
+    try {
+      // Step 1: Find all groups the user is a member of
+      const groupsSnapshot = await db
+        .collection('groups')
+        .where('memberIds', 'array-contains', userId)
+        .get();
+
+      const batch = db.batch();
+      const profilePhotosToDelete: string[] = [];
+
+      for (const groupDoc of groupsSnapshot.docs) {
+        const groupData = groupDoc.data();
+        const groupId = groupDoc.id;
+
+        // Find the user's member data
+        const userMember = groupData.members?.find(
+          (m: any) => m.userId === userId
+        );
+        const userName = userMember?.name || 'Former Member';
+
+        // Save profile photo URI for deletion
+        if (userMember?.profileImageUri) {
+          profilePhotosToDelete.push(userMember.profileImageUri);
+        }
+
+        // Step 2: Remove user from members and memberIds arrays
+        const updatedMembers = (groupData.members || []).filter(
+          (m: any) => m.userId !== userId
+        );
+        const updatedMemberIds = (groupData.memberIds || []).filter(
+          (id: string) => id !== userId
+        );
+
+        batch.update(groupDoc.ref, {
+          members: updatedMembers,
+          memberIds: updatedMemberIds,
+        });
+
+        // Step 3: Anonymize menu proposals in this group
+        const menusSnapshot = await db
+          .collection('groups')
+          .doc(groupId)
+          .collection('menus')
+          .where('proposedBy', '==', userName)
+          .get();
+
+        for (const menuDoc of menusSnapshot.docs) {
+          batch.update(menuDoc.ref, {
+            proposedBy: 'Former Member',
+          });
+        }
+
+        // Step 4: Release all item reservations in this group
+        const allMenusSnapshot = await db
+          .collection('groups')
+          .doc(groupId)
+          .collection('menus')
+          .get();
+
+        for (const menuDoc of allMenusSnapshot.docs) {
+          const itemsSnapshot = await menuDoc.ref
+            .collection('items')
+            .where('reservedBy', '==', userName)
+            .get();
+
+          for (const itemDoc of itemsSnapshot.docs) {
+            batch.update(itemDoc.ref, {
+              reservedBy: null,
+            });
+          }
+        }
+
+        // Step 5: Remove from attendees arrays
+        const attendeeMenusSnapshot = await db
+          .collection('groups')
+          .doc(groupId)
+          .collection('menus')
+          .where('attendees', 'array-contains', { name: userName })
+          .get();
+
+        for (const menuDoc of attendeeMenusSnapshot.docs) {
+          const menuData = menuDoc.data();
+          const updatedAttendees = (menuData.attendees || []).filter(
+            (a: any) => a.name !== userName
+          );
+          batch.update(menuDoc.ref, {
+            attendees: updatedAttendees,
+          });
+        }
+      }
+
+      // Commit all Firestore updates
+      await batch.commit();
+      functions.logger.info('Firestore data updated');
+
+      // Step 6: Delete profile photos from Storage
+      if (profilePhotosToDelete.length > 0) {
+        const bucket = storage.bucket();
+        for (const photoUrl of profilePhotosToDelete) {
+          try {
+            // Extract file path from URL
+            const urlParts = photoUrl.split('/');
+            const filePathIndex = urlParts.indexOf('profile-images');
+            if (filePathIndex !== -1) {
+              const filePath = urlParts.slice(filePathIndex).join('/');
+              const file = bucket.file(filePath);
+              await file.delete();
+              functions.logger.info('Deleted profile photo:', filePath);
+            }
+          } catch (error) {
+            // Log but don't fail the entire operation
+            functions.logger.warn('Failed to delete profile photo:', error);
+          }
+        }
+      }
+
+      functions.logger.info(`Account deletion complete for user: ${userId}`);
+      return {
+        success: true,
+        message: 'Account and all associated data have been deleted successfully',
+      };
+    } catch (error) {
+      functions.logger.error('Account deletion failed:', error);
+      throw new functions.https.HttpsError(
+        'internal',
+        'Failed to delete account. Please try again or contact support.'
+      );
+    }
+  }
+);
+
 export const generateMenuImage = functions.https.onCall(
   {
     region: 'us-central1',

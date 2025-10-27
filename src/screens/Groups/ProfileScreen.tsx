@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, FlatList, Alert, Share, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, FlatList, Alert, Share, TouchableOpacity, Linking, Platform } from 'react-native';
 import {
   Text,
   Card,
@@ -23,7 +23,11 @@ import { useAppStore } from '../../store';
 import { createGroup, joinGroup, getGroupById, updateMemberInfo } from '../../services/groupService';
 import { uploadProfileImage } from '../../services/storageService';
 import { requestNotificationPermissions, DEFAULT_NOTIFICATION_PREFERENCES } from '../../services/notificationService';
+import { isAnonymous, hasLinkedAccount, linkWithEmailAndPassword, getUserEmail, getCurrentUserId, signOut, deleteAuthAccount } from '../../services/authService';
 import { Group, GroupMembership, RootStackParamList, NotificationPreferences } from '../../types';
+import { PRIVACY_POLICY_URL, TERMS_OF_SERVICE_URL, SUPPORT_EMAIL, APP_VERSION } from '../../config/constants';
+import { functions } from '../../services/firebase';
+import { httpsCallable } from 'firebase/functions';
 
 type ProfileScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -50,6 +54,16 @@ export default function ProfileScreen() {
   const [newName, setNewName] = useState('');
   const [newAdults, setNewAdults] = useState(1);
   const [newChildren, setNewChildren] = useState(0);
+
+  // Account linking state
+  const [linkAccountVisible, setLinkAccountVisible] = useState(false);
+  const [linkEmail, setLinkEmail] = useState('');
+  const [linkPassword, setLinkPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+
+  // Delete account state
+  const [deleteAccountVisible, setDeleteAccountVisible] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
 
   useEffect(() => {
     loadGroups();
@@ -121,8 +135,15 @@ export default function ProfileScreen() {
     setError('');
 
     try {
+      // Get current user ID
+      const userId = getCurrentUserId();
+      if (!userId) {
+        throw new Error('User not authenticated. Please restart the app.');
+      }
+
       // Create group member object from user profile (only include profileImageUri if it exists)
       const memberData = {
+        userId,
         name: userProfile.name,
         ...(userProfile.profileImageUri && { profileImageUri: userProfile.profileImageUri }),
         partySize: userProfile.partySize,
@@ -174,8 +195,15 @@ export default function ProfileScreen() {
     setError('');
 
     try {
+      // Get current user ID
+      const userId = getCurrentUserId();
+      if (!userId) {
+        throw new Error('User not authenticated. Please restart the app.');
+      }
+
       // Create group member object from user profile (only include profileImageUri if it exists)
       const memberData = {
+        userId,
         name: userProfile.name,
         ...(userProfile.profileImageUri && { profileImageUri: userProfile.profileImageUri }),
         partySize: userProfile.partySize,
@@ -415,6 +443,110 @@ export default function ProfileScreen() {
     }
   };
 
+  const handleLinkAccount = async () => {
+    if (!linkEmail.trim() || !linkPassword.trim()) {
+      setError('Please enter both email and password');
+      return;
+    }
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(linkEmail)) {
+      setError('Please enter a valid email address');
+      return;
+    }
+
+    if (linkPassword.length < 6) {
+      setError('Password must be at least 6 characters');
+      return;
+    }
+
+    setProcessing(true);
+    setError('');
+
+    try {
+      await linkWithEmailAndPassword(linkEmail.trim(), linkPassword);
+
+      setLinkAccountVisible(false);
+      setLinkEmail('');
+      setLinkPassword('');
+
+      Alert.alert(
+        'Account Linked!',
+        'Your account is now linked to your email. You can sign in from any device using this email and password.',
+        [{ text: 'Great!' }]
+      );
+    } catch (err) {
+      console.error('Error linking account:', err);
+      setError(err instanceof Error ? err.message : 'Failed to link account. Please try again.');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleExportData = async () => {
+    setProcessing(true);
+
+    try {
+      // Gather all user data
+      const exportData = {
+        profile: userProfile,
+        groups: groups,
+        exportDate: new Date().toISOString(),
+        appVersion: APP_VERSION,
+      };
+
+      // Convert to formatted JSON
+      const jsonString = JSON.stringify(exportData, null, 2);
+
+      // Share the data
+      await Share.share({
+        message: jsonString,
+        title: 'Group Menu Planner - My Data Export',
+      });
+    } catch (err) {
+      console.error('Error exporting data:', err);
+      Alert.alert('Export Failed', 'Failed to export data. Please try again.');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmText !== 'DELETE') {
+      setError('Please type DELETE to confirm');
+      return;
+    }
+
+    setProcessing(true);
+    setError('');
+
+    try {
+      // Call the Cloud Function to delete all user data
+      const deleteUserAccountFn = httpsCallable(functions, 'deleteUserAccount');
+      const result = await deleteUserAccountFn();
+
+      console.log('Account deletion result:', result.data);
+
+      // Delete Firebase Auth account
+      await deleteAuthAccount();
+
+      // Clear local storage
+      await AsyncStorage.clear();
+
+      // User will be redirected to onboarding automatically
+      Alert.alert(
+        'Account Deleted',
+        'Your account and all associated data have been permanently deleted.',
+        [{ text: 'OK' }]
+      );
+    } catch (err) {
+      console.error('Error deleting account:', err);
+      setError(err instanceof Error ? err.message : 'Failed to delete account. Please contact support.');
+      setProcessing(false);
+    }
+  };
+
   if (loading) {
     return <Loading message="Loading your groups..." />;
   }
@@ -492,10 +624,31 @@ export default function ProfileScreen() {
             <Menu.Item
               onPress={() => {
                 setMenuVisible(false);
+                const emailBody = `Please describe your issue or feedback below:\n\n\n\n---\nApp Version: ${APP_VERSION}\nUser ID: ${getCurrentUserId()}\nDevice: ${Platform.OS}`;
+                const subject = 'Group Menu Planner - Issue Report';
+                Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(emailBody)}`);
+              }}
+              title="Report an Issue"
+              leadingIcon="email-alert"
+            />
+            <Menu.Item
+              onPress={() => {
+                setMenuVisible(false);
                 handleClearData();
               }}
               title="Clear Data (Dev)"
               leadingIcon="delete-sweep"
+            />
+            <Menu.Item
+              onPress={() => {
+                setMenuVisible(false);
+                setDeleteAccountVisible(true);
+                setDeleteConfirmText('');
+                setError('');
+              }}
+              title="Delete Account"
+              leadingIcon="account-remove"
+              titleStyle={{ color: colors.error }}
             />
           </Menu>
         </View>
@@ -535,6 +688,79 @@ export default function ProfileScreen() {
         </View>
       )}
 
+      {/* Account Status / Linking */}
+      <View style={styles.accountSection}>
+        <Text variant="titleMedium" style={styles.sectionTitle}>
+          Account
+        </Text>
+        <Card style={styles.accountCard}>
+          <Card.Content>
+            {hasLinkedAccount() ? (
+              <>
+                <View style={styles.accountRow}>
+                  <MaterialCommunityIcons name="check-circle" size={24} color={colors.success} />
+                  <View style={styles.accountInfo}>
+                    <Text variant="titleSmall" style={styles.accountStatusText}>
+                      Account Linked
+                    </Text>
+                    <Text variant="bodySmall" style={styles.accountDetailText}>
+                      {getUserEmail()}
+                    </Text>
+                    <Text variant="bodySmall" style={styles.accountHintText}>
+                      You can sign in from any device using this email
+                    </Text>
+                  </View>
+                </View>
+              </>
+            ) : (
+              <>
+                <View style={styles.accountRow}>
+                  <MaterialCommunityIcons name="alert-circle-outline" size={24} color={colors.warning} />
+                  <View style={styles.accountInfo}>
+                    <Text variant="titleSmall" style={styles.accountStatusText}>
+                      Temporary Account
+                    </Text>
+                    <Text variant="bodySmall" style={styles.accountHintText}>
+                      Link your account to access it from other devices
+                    </Text>
+                  </View>
+                </View>
+                <Button
+                  mode="contained"
+                  onPress={() => {
+                    setLinkAccountVisible(true);
+                    setError('');
+                  }}
+                  style={styles.linkAccountButton}
+                  icon="link"
+                >
+                  Link Account
+                </Button>
+              </>
+            )}
+
+            {/* Export Data Button - GDPR Compliance */}
+            <View style={{ borderTopWidth: 1, borderTopColor: colors.border, marginTop: spacing.md, paddingTop: spacing.md }}>
+              <Text variant="titleSmall" style={styles.accountStatusText}>
+                Data Privacy
+              </Text>
+              <Text variant="bodySmall" style={[styles.accountHintText, { marginBottom: spacing.sm }]}>
+                Download all your data in JSON format
+              </Text>
+              <Button
+                mode="outlined"
+                onPress={handleExportData}
+                disabled={processing}
+                icon="download"
+                style={{ marginTop: spacing.xs }}
+              >
+                Export My Data
+              </Button>
+            </View>
+          </Card.Content>
+        </Card>
+      </View>
+
       {/* Notification Settings */}
       <View style={styles.notificationSection}>
         <Text variant="titleMedium" style={styles.notificationSectionTitle}>
@@ -545,6 +771,31 @@ export default function ProfileScreen() {
           onPreferencesChange={handleNotificationPreferencesChange}
           loading={processing}
         />
+      </View>
+
+      {/* Legal Links Footer */}
+      <View style={styles.legalFooter}>
+        <TouchableOpacity onPress={() => Linking.openURL(PRIVACY_POLICY_URL)}>
+          <Text variant="bodySmall" style={styles.legalLink}>
+            Privacy Policy
+          </Text>
+        </TouchableOpacity>
+        <Text variant="bodySmall" style={styles.legalSeparator}>
+          •
+        </Text>
+        <TouchableOpacity onPress={() => Linking.openURL(TERMS_OF_SERVICE_URL)}>
+          <Text variant="bodySmall" style={styles.legalLink}>
+            Terms of Service
+          </Text>
+        </TouchableOpacity>
+      </View>
+      <View style={styles.appVersion}>
+        <Text variant="bodySmall" style={styles.versionText}>
+          Version {APP_VERSION}
+        </Text>
+        <Text variant="bodySmall" style={styles.supportText}>
+          Support: {SUPPORT_EMAIL}
+        </Text>
       </View>
     </>
   );
@@ -702,6 +953,127 @@ export default function ProfileScreen() {
             </Button>
           </Dialog.Actions>
         </Dialog>
+
+        {/* Link Account Dialog */}
+        <Dialog visible={linkAccountVisible} onDismiss={() => setLinkAccountVisible(false)}>
+          <Dialog.Title>Link Your Account</Dialog.Title>
+          <Dialog.Content>
+            <Text variant="bodyMedium" style={styles.linkAccountHint}>
+              Link your account to an email and password so you can access your data from any device.
+            </Text>
+            <TextInput
+              mode="outlined"
+              label="Email"
+              value={linkEmail}
+              onChangeText={(text) => {
+                setLinkEmail(text);
+                setError('');
+              }}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+              error={!!error}
+              disabled={processing}
+              style={styles.linkAccountInput}
+            />
+            <TextInput
+              mode="outlined"
+              label="Password"
+              value={linkPassword}
+              onChangeText={(text) => {
+                setLinkPassword(text);
+                setError('');
+              }}
+              secureTextEntry={!showPassword}
+              right={
+                <TextInput.Icon
+                  icon={showPassword ? 'eye-off' : 'eye'}
+                  onPress={() => setShowPassword(!showPassword)}
+                />
+              }
+              error={!!error}
+              disabled={processing}
+              style={styles.linkAccountInput}
+            />
+            <Text variant="bodySmall" style={styles.linkAccountNote}>
+              Password must be at least 6 characters
+            </Text>
+            {error && <Text style={styles.errorText}>{error}</Text>}
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setLinkAccountVisible(false)} disabled={processing}>
+              Cancel
+            </Button>
+            <Button
+              onPress={handleLinkAccount}
+              loading={processing}
+              disabled={processing}
+            >
+              Link Account
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
+
+        {/* Delete Account Dialog */}
+        <Dialog visible={deleteAccountVisible} onDismiss={() => setDeleteAccountVisible(false)}>
+          <Dialog.Title>Delete Account</Dialog.Title>
+          <Dialog.Content>
+            <Text variant="bodyMedium" style={{ color: colors.error, marginBottom: spacing.md }}>
+              ⚠️ WARNING: This action is permanent and cannot be undone!
+            </Text>
+            <Text variant="bodyMedium" style={styles.linkAccountHint}>
+              Deleting your account will:
+            </Text>
+            <View style={{ marginLeft: spacing.md, marginTop: spacing.sm }}>
+              <Text variant="bodySmall" style={styles.linkAccountHint}>
+                • Remove you from all groups
+              </Text>
+              <Text variant="bodySmall" style={styles.linkAccountHint}>
+                • Anonymize your menu proposals
+              </Text>
+              <Text variant="bodySmall" style={styles.linkAccountHint}>
+                • Release all your item reservations
+              </Text>
+              <Text variant="bodySmall" style={styles.linkAccountHint}>
+                • Delete your profile photo
+              </Text>
+              <Text variant="bodySmall" style={styles.linkAccountHint}>
+                • Delete your authentication credentials
+              </Text>
+            </View>
+            <Text variant="bodyMedium" style={{ marginTop: spacing.md, marginBottom: spacing.sm }}>
+              To confirm, type <Text style={{ fontWeight: 'bold' }}>DELETE</Text> below:
+            </Text>
+            <TextInput
+              mode="outlined"
+              value={deleteConfirmText}
+              onChangeText={(text) => {
+                setDeleteConfirmText(text);
+                setError('');
+              }}
+              placeholder="Type DELETE"
+              autoCapitalize="characters"
+              error={!!error}
+              disabled={processing}
+              style={styles.linkAccountInput}
+            />
+            {error && <Text style={styles.errorText}>{error}</Text>}
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setDeleteAccountVisible(false)} disabled={processing}>
+              Cancel
+            </Button>
+            <Button
+              onPress={handleDeleteAccount}
+              loading={processing}
+              disabled={processing}
+              buttonColor={colors.error}
+              textColor={colors.text.onPrimary}
+            >
+              Delete Forever
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
       </Portal>
     </Screen>
   );
@@ -831,6 +1203,57 @@ const styles = StyleSheet.create({
   partySize: {
     color: colors.text.secondary,
   },
+  accountSection: {
+    padding: spacing.lg,
+    backgroundColor: colors.background,
+  },
+  accountCard: {
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
+    ...elevation.level1,
+  },
+  accountRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.md,
+    marginBottom: spacing.md,
+  },
+  accountInfo: {
+    flex: 1,
+  },
+  accountStatusText: {
+    fontWeight: '600',
+    color: colors.text.primary,
+    marginBottom: spacing.xs,
+  },
+  accountDetailText: {
+    color: colors.text.primary,
+    marginBottom: spacing.xs,
+  },
+  accountHintText: {
+    color: colors.text.secondary,
+    fontSize: 12,
+  },
+  linkAccountButton: {
+    marginTop: spacing.sm,
+  },
+  linkAccountHint: {
+    color: colors.text.secondary,
+    marginBottom: spacing.md,
+  },
+  linkAccountInput: {
+    marginTop: spacing.md,
+  },
+  linkAccountNote: {
+    color: colors.text.secondary,
+    marginTop: spacing.xs,
+    marginLeft: spacing.sm,
+  },
+  sectionTitle: {
+    fontWeight: '600',
+    color: colors.text.primary,
+    marginBottom: spacing.md,
+  },
   notificationSection: {
     padding: spacing.lg,
     backgroundColor: colors.background,
@@ -919,5 +1342,36 @@ const styles = StyleSheet.create({
   errorText: {
     color: colors.error,
     marginTop: spacing.sm,
+  },
+  legalFooter: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.xl,
+    paddingBottom: spacing.sm,
+    backgroundColor: colors.background,
+  },
+  legalLink: {
+    color: colors.primary,
+    textDecorationLine: 'underline',
+  },
+  legalSeparator: {
+    color: colors.text.secondary,
+  },
+  appVersion: {
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.xxl,
+    backgroundColor: colors.background,
+    alignItems: 'center',
+  },
+  versionText: {
+    color: colors.text.secondary,
+    marginBottom: spacing.xs,
+  },
+  supportText: {
+    color: colors.text.secondary,
+    fontSize: 11,
   },
 });

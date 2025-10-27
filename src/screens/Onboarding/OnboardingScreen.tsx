@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, Image, TouchableOpacity, Alert } from 'react-native';
+import { View, StyleSheet, Image, TouchableOpacity, Alert, Linking } from 'react-native';
 import { Text, Button, TextInput, SegmentedButtons, IconButton } from 'react-native-paper';
 import * as ImagePicker from 'expo-image-picker';
 import { Screen, Loading, PartySizeInput, Avatar } from '../../components';
@@ -7,7 +7,9 @@ import { colors, spacing, borderRadius, elevation } from '../../theme';
 import { useAppStore } from '../../store';
 import { createGroup, joinGroup } from '../../services/groupService';
 import { uploadProfileImage } from '../../services/storageService';
+import { getCurrentUserId } from '../../services/authService';
 import { GroupMember } from '../../types';
+import { PRIVACY_POLICY_URL, TERMS_OF_SERVICE_URL } from '../../config/constants';
 
 type OnboardingStep = 'welcome' | 'name' | 'profile' | 'group';
 type GroupMode = 'create' | 'join';
@@ -79,12 +81,18 @@ export default function OnboardingScreen() {
     setError('');
 
     try {
+      // Get the current user's auth ID
+      const userId = getCurrentUserId();
+      if (!userId) {
+        throw new Error('User not authenticated. Please restart the app.');
+      }
+
       // Upload profile image if provided (optional - continues without if it fails)
       let uploadedImageUri: string | undefined;
       if (profileImageUri) {
         try {
-          const userId = `${name.trim()}_${Date.now()}`;
-          uploadedImageUri = await uploadProfileImage(userId, profileImageUri);
+          const storageUserId = `${userId}_${Date.now()}`;
+          uploadedImageUri = await uploadProfileImage(storageUserId, profileImageUri);
         } catch (uploadError) {
           console.warn('Failed to upload profile image, continuing without it:', uploadError);
           // Continue without profile image - it's optional
@@ -93,16 +101,18 @@ export default function OnboardingScreen() {
 
       // Create group member object (only include profileImageUri if it exists)
       const memberData: GroupMember = {
+        userId, // Firebase Auth UID
         name: name.trim(),
         ...(uploadedImageUri && { profileImageUri: uploadedImageUri }),
         partySize: { adults, children },
         joinedAt: new Date(),
-      } as GroupMember;
+      };
 
       const { group, code } = await createGroup(groupName.trim(), memberData);
 
       // Save user profile (only include profileImageUri if it exists)
       await setUserProfile({
+        userId, // Firebase Auth UID
         name: name.trim(),
         ...(uploadedImageUri && { profileImageUri: uploadedImageUri }),
         partySize: { adults, children },
@@ -120,7 +130,7 @@ export default function OnboardingScreen() {
       await setCurrentGroup(group.id);
     } catch (err) {
       console.error('Error creating group:', err);
-      setError('Failed to create group. Please try again.');
+      setError(err instanceof Error ? err.message : 'Failed to create group. Please try again.');
       setLoading(false);
     }
   };
@@ -135,12 +145,18 @@ export default function OnboardingScreen() {
     setError('');
 
     try {
+      // Get the current user's auth ID
+      const userId = getCurrentUserId();
+      if (!userId) {
+        throw new Error('User not authenticated. Please restart the app.');
+      }
+
       // Upload profile image if provided (optional - continues without if it fails)
       let uploadedImageUri: string | undefined;
       if (profileImageUri) {
         try {
-          const userId = `${name.trim()}_${Date.now()}`;
-          uploadedImageUri = await uploadProfileImage(userId, profileImageUri);
+          const storageUserId = `${userId}_${Date.now()}`;
+          uploadedImageUri = await uploadProfileImage(storageUserId, profileImageUri);
         } catch (uploadError) {
           console.warn('Failed to upload profile image, continuing without it:', uploadError);
           // Continue without profile image - it's optional
@@ -149,16 +165,18 @@ export default function OnboardingScreen() {
 
       // Create group member object (only include profileImageUri if it exists)
       const memberData: GroupMember = {
+        userId, // Firebase Auth UID
         name: name.trim(),
         ...(uploadedImageUri && { profileImageUri: uploadedImageUri }),
         partySize: { adults, children },
         joinedAt: new Date(),
-      } as GroupMember;
+      };
 
       const group = await joinGroup(groupCode.trim().toUpperCase(), memberData);
 
       // Save user profile (only include profileImageUri if it exists)
       await setUserProfile({
+        userId, // Firebase Auth UID
         name: name.trim(),
         ...(uploadedImageUri && { profileImageUri: uploadedImageUri }),
         partySize: { adults, children },
@@ -179,7 +197,7 @@ export default function OnboardingScreen() {
       if (err instanceof Error && err.message === 'Group not found') {
         setError('Group not found. Please check the code and try again.');
       } else {
-        setError('Failed to join group. Please try again.');
+        setError(err instanceof Error ? err.message : 'Failed to join group. Please try again.');
       }
       setLoading(false);
     }
@@ -211,6 +229,19 @@ export default function OnboardingScreen() {
               <FeatureItem icon="🛒" text="Auto-generated shopping lists" />
               <FeatureItem icon="👥" text="Easy group coordination" />
             </View>
+          </View>
+
+          <View style={styles.legalConsent}>
+            <Text variant="bodySmall" style={styles.consentText}>
+              By continuing, you agree to our{' '}
+              <Text style={styles.legalLink} onPress={() => Linking.openURL(TERMS_OF_SERVICE_URL)}>
+                Terms of Service
+              </Text>
+              {' '}and{' '}
+              <Text style={styles.legalLink} onPress={() => Linking.openURL(PRIVACY_POLICY_URL)}>
+                Privacy Policy
+              </Text>
+            </Text>
           </View>
 
           <Button
@@ -594,5 +625,17 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.lg,
     padding: spacing.lg,
     ...elevation.level1,
+  },
+  legalConsent: {
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+  },
+  consentText: {
+    color: colors.text.secondary,
+    textAlign: 'center',
+  },
+  legalLink: {
+    color: colors.primary,
+    textDecorationLine: 'underline',
   },
 });

@@ -66,6 +66,7 @@ export async function createGroup(
       name: groupName,
       code,
       members: [creator],
+      memberIds: [creator.userId], // Add memberIds array for security rules
       createdAt: new Date(),
     };
 
@@ -77,6 +78,7 @@ export async function createGroup(
         ...member,
         joinedAt: Timestamp.fromDate(member.joinedAt),
       })),
+      memberIds: groupData.memberIds,
       createdAt: Timestamp.fromDate(groupData.createdAt),
     };
 
@@ -124,6 +126,7 @@ export async function getGroupByCode(code: string): Promise<Group | null> {
       name: data.name,
       code: data.code,
       members,
+      memberIds: data.memberIds || members.map((m: GroupMember) => m.userId), // Fallback for legacy data
       createdAt: data.createdAt.toDate(),
     };
   } catch (error) {
@@ -146,8 +149,8 @@ export async function joinGroup(
       throw new Error('Group not found');
     }
 
-    // Check if member is already in the group
-    const existingMember = group.members.find((m) => m.name === member.name);
+    // Check if member is already in the group by userId
+    const existingMember = group.members.find((m) => m.userId === member.userId);
     if (existingMember) {
       return group;
     }
@@ -161,11 +164,13 @@ export async function joinGroup(
 
     await updateDoc(groupRef, {
       members: arrayUnion(memberData),
+      memberIds: arrayUnion(member.userId), // Add userId to memberIds array
     });
 
     return {
       ...group,
       members: [...group.members, member],
+      memberIds: [...group.memberIds, member.userId],
     };
   } catch (error) {
     console.error('Error joining group:', error);
@@ -204,6 +209,7 @@ export async function getGroupById(groupId: string): Promise<Group | null> {
       name: data.name,
       code: data.code,
       members,
+      memberIds: data.memberIds || members.map((m: GroupMember) => m.userId), // Fallback for legacy data
       createdAt: data.createdAt.toDate(),
     };
   } catch (error) {
@@ -298,6 +304,9 @@ export async function removeMemberFromGroup(
       throw new Error('Member not found in group');
     }
 
+    // Get the updated memberIds array
+    const updatedMemberIds = updatedMembers.map((member) => member.userId);
+
     // Convert dates for Firestore
     const firestoreMembers = updatedMembers.map((member) => ({
       ...member,
@@ -307,6 +316,7 @@ export async function removeMemberFromGroup(
     const groupRef = doc(db, GROUPS_COLLECTION, groupId);
     await updateDoc(groupRef, {
       members: firestoreMembers,
+      memberIds: updatedMemberIds,
     });
   } catch (error) {
     console.error('Error removing member from group:', error);

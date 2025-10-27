@@ -10,6 +10,7 @@ import AppNavigator from './src/navigation/AppNavigator';
 import { GroupSelectorModal } from './src/components';
 import { theme } from './src/theme';
 import { useAppStore } from './src/store';
+import { signInAnonymously, getCurrentUser, onAuthStateChange } from './src/services/authService';
 
 // Configure how notifications should be handled when app is in foreground
 Notifications.setNotificationHandler({
@@ -36,14 +37,33 @@ export default function App() {
   const backgroundTime = useRef<Date | null>(null);
 
   useEffect(() => {
-    // Load user profile from AsyncStorage on app start
+    // Initialize authentication and load user profile on app start
     const initializeApp = async () => {
-      // Check if we should clear storage (useful for testing onboarding)
-      if (CLEAR_STORAGE_ON_START === 'true') {
-        console.log('CLEAR_STORAGE_ON_START is enabled - clearing AsyncStorage');
-        await AsyncStorage.clear();
+      try {
+        // Check if we should clear storage (useful for testing onboarding)
+        if (CLEAR_STORAGE_ON_START === 'true') {
+          console.log('CLEAR_STORAGE_ON_START is enabled - clearing AsyncStorage');
+          await AsyncStorage.clear();
+        }
+
+        // Step 1: Ensure user is authenticated (anonymous or linked account)
+        const currentUser = getCurrentUser();
+        if (!currentUser) {
+          // No user signed in - sign in anonymously (zero friction!)
+          console.log('No user signed in - signing in anonymously');
+          await signInAnonymously();
+          console.log('Anonymous sign-in successful');
+        } else {
+          console.log('User already authenticated:', currentUser.uid);
+        }
+
+        // Step 2: Load user profile from AsyncStorage
+        loadUserProfile();
+      } catch (error) {
+        console.error('Error initializing app:', error);
+        // Still try to load profile even if auth fails
+        loadUserProfile();
       }
-      loadUserProfile();
     };
 
     initializeApp();

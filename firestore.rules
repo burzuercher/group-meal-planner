@@ -20,7 +20,8 @@ service cloud.firestore {
                       request.resource.data.memberIds[0] == request.auth.uid;
 
       // Members can read their group data
-      allow read: if isMemberOfGroup(groupId);
+      // Also allow reading for code validation (when creating/joining groups)
+      allow read: if isAuthenticated();
 
       // Members can update group (for joining, editing name, etc.)
       allow update: if isMemberOfGroup(groupId);

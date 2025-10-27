@@ -365,14 +365,21 @@ export default function MenuDetailsScreen() {
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.headerTop}>
-            <MenuImage
-              imageUrl={menu.imageUrl}
-              isGenerating={menu.imageGenerating}
-              title={menu.name}
-              size="small"
-              style={styles.headerImage}
-              onPress={() => setShowImageLightbox(true)}
-            />
+            <View>
+              <MenuImage
+                imageUrl={menu.imageUrl}
+                isGenerating={menu.imageGenerating}
+                title={menu.name}
+                size="small"
+                style={styles.headerImage}
+                onPress={() => setShowImageLightbox(true)}
+              />
+              {menu.imageUrl && (
+                <Text variant="bodySmall" style={styles.aiDisclosure}>
+                  ✨ Image created with AI
+                </Text>
+              )}
+            </View>
             <View style={styles.headerContent}>
               <Text variant="headlineSmall" style={styles.headerTitle}>
                 {menu.name}
@@ -675,6 +682,12 @@ const styles = StyleSheet.create({
   },
   headerImage: {
     flexShrink: 0,
+  },
+  aiDisclosure: {
+    color: colors.text.secondary,
+    fontSize: 11,
+    marginTop: spacing.xs,
+    textAlign: 'center',
   },
   headerContent: {
     flex: 1,

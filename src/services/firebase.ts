@@ -2,6 +2,8 @@ import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import { getFunctions, connectFunctionsEmulator } from 'firebase/functions';
+import { initializeAuth, getReactNativePersistence } from 'firebase/auth';
+import ReactNativeAsyncStorage from '@react-native-async-storage/async-storage';
 import {
   FIREBASE_API_KEY,
   FIREBASE_AUTH_DOMAIN,
@@ -34,6 +36,11 @@ export const storage = getStorage(app);
 
 // Initialize Cloud Functions
 export const functions = getFunctions(app, 'us-central1');
+
+// Initialize Authentication with React Native persistence
+export const auth = initializeAuth(app, {
+  persistence: getReactNativePersistence(ReactNativeAsyncStorage),
+});
 
 // Uncomment to use Firebase Functions Emulator during development
 // connectFunctionsEmulator(functions, 'localhost', 5001);

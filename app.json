@@ -1,12 +1,14 @@
 {
   "expo": {
-    "name": "temp-expo",
-    "slug": "temp-expo",
+    "name": "Group Menu Planner",
+    "slug": "group-menu-planner",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
+    "description": "Coordinate shared meals with your group. Plan menus, reserve items, and generate shopping lists together. Features AI-generated menu images and meal reminders.",
+    "privacy": "public",
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
@@ -15,7 +17,15 @@
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "UIBackgroundModes": ["remote-notification"]
+        "UIBackgroundModes": [
+          "remote-notification",
+          "remote-notification"
+        ],
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "bundleIdentifier": "com.berzuerch.groupmenuplanner",
+      "config": {
+        "usesNonExemptEncryption": false
       }
     },
     "android": {
@@ -37,12 +47,20 @@
         {
           "icon": "./assets/notification-icon.png",
           "color": "#2e7d32",
-          "sounds": ["./assets/notification.wav"]
+          "sounds": [
+            "./assets/notification.wav"
+          ]
         }
       ]
     ],
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "cc16fcca-4ec3-4976-97f8-fb163e921087"
+      }
+    },
+    "owner": "berzuerch"
   }
 }

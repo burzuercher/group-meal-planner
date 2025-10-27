@@ -25,6 +25,7 @@ export interface NotificationPreferences {
 
 // User Profile (stored locally)
 export interface UserProfile {
+  userId: string; // Firebase Auth UID
   name: string;
   profileImageUri?: string; // Firebase Storage download URL
   partySize: PartySize;
@@ -41,6 +42,7 @@ export interface GroupMembership {
 
 // Group Member
 export interface GroupMember {
+  userId: string; // Firebase Auth UID
   name: string;
   profileImageUri?: string;
   partySize: PartySize;
@@ -53,6 +55,7 @@ export interface Group {
   name: string;
   code: string; // Shareable code to join group
   members: GroupMember[]; // Array of member objects (was string[] for backward compatibility)
+  memberIds: string[]; // Array of Firebase Auth UIDs for security rules
   createdAt: Date;
 }
 
