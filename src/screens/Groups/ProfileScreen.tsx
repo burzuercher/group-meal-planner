@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, FlatList, Alert, Share, TouchableOpacity, Linking, Platform } from 'react-native';
+import { View, StyleSheet, FlatList, Alert, Share, TouchableOpacity, Linking, Platform, RefreshControl } from 'react-native';
 import {
   Text,
   Card,
@@ -37,6 +37,7 @@ export default function ProfileScreen() {
     []
   );
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [menuVisible, setMenuVisible] = useState(false);
 
   useEffect(() => {
@@ -94,6 +95,20 @@ export default function ProfileScreen() {
       console.error('Error loading groups:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([
+        loadGroups(),
+        syncProfileToGroups(),
+      ]);
+    } catch (error) {
+      console.error('Error refreshing:', error);
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -535,7 +550,7 @@ export default function ProfileScreen() {
             onPress={() => setCurrentGroup(item.groupId)}
             onEdit={() => navigation.navigate('GroupDetails', { groupId: item.groupId })}
             onShare={() => shareGroupCode(item.groupName, item.code)}
-            onRemove={() => handleRemoveGroup(item)}
+            onRemove={() => handleRemoveGroup(item.groupId, item.groupName)}
           />
         )}
         ListHeaderComponent={renderHeader}
@@ -543,6 +558,14 @@ export default function ProfileScreen() {
         ListEmptyComponent={renderEmptyState}
         contentContainerStyle={styles.listContent}
         style={styles.container}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            colors={[colors.primary]}
+            tintColor={colors.primary}
+          />
+        }
       />
     </Screen>
   );
