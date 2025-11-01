@@ -14,6 +14,7 @@ interface AppState {
   addGroup: (group: GroupMembership) => Promise<void>;
   setCurrentGroup: (groupId: string) => Promise<void>;
   removeGroup: (groupId: string) => Promise<void>;
+  clearUserProfile: () => void;
   loadUserProfile: () => Promise<void>;
 }
 
@@ -95,6 +96,10 @@ export const useAppStore = create<AppState>((set, get) => ({
         set({ currentGroupId: null });
       }
     }
+  },
+
+  clearUserProfile: () => {
+    set({ userProfile: null, currentGroupId: null, lastGroupSelectionTime: null });
   },
 
   loadUserProfile: async () => {

@@ -11,6 +11,11 @@ import ProposeMenuScreen from '../screens/Menu/ProposeMenuScreen';
 import MenuDetailsScreen from '../screens/Menu/MenuDetailsScreen';
 import AddEditItemScreen from '../screens/Menu/AddEditItemScreen';
 import GroupDetailsScreen from '../screens/Groups/GroupDetailsScreen';
+import EditNameScreen from '../screens/Profile/EditNameScreen';
+import EditPartySizeScreen from '../screens/Profile/EditPartySizeScreen';
+import LinkAccountScreen from '../screens/Profile/LinkAccountScreen';
+import DeleteAccountScreen from '../screens/Profile/DeleteAccountScreen';
+import CreateJoinGroupScreen from '../screens/Profile/CreateJoinGroupScreen';
 
 const Stack = createStackNavigator<RootStackParamList>();
 
@@ -64,6 +69,51 @@ export default function AppNavigator() {
                 headerShown: true,
                 title: 'Group Details'
               }}
+            />
+            <Stack.Screen
+              name="EditName"
+              component={EditNameScreen}
+              options={{
+                headerShown: true,
+                title: 'Edit Name',
+                presentation: 'modal'
+              }}
+            />
+            <Stack.Screen
+              name="EditPartySize"
+              component={EditPartySizeScreen}
+              options={{
+                headerShown: true,
+                title: 'Edit Party Size',
+                presentation: 'modal'
+              }}
+            />
+            <Stack.Screen
+              name="LinkAccount"
+              component={LinkAccountScreen}
+              options={{
+                headerShown: true,
+                title: 'Link Account',
+                presentation: 'modal'
+              }}
+            />
+            <Stack.Screen
+              name="DeleteAccount"
+              component={DeleteAccountScreen}
+              options={{
+                headerShown: true,
+                title: 'Delete Account',
+                presentation: 'modal'
+              }}
+            />
+            <Stack.Screen
+              name="CreateJoinGroup"
+              component={CreateJoinGroupScreen}
+              options={({ route }) => ({
+                headerShown: true,
+                title: route.params.mode === 'create' ? 'Create Group' : 'Join Group',
+                presentation: 'modal'
+              })}
             />
           </>
         )}

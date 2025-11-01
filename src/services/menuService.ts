@@ -299,7 +299,7 @@ export async function updateMenuStatus(
           name: member.name,
           adults: member.partySize.adults,
           children: member.partySize.children,
-          profileImageUri: member.profileImageUri,
+          ...(member.profileImageUri && { profileImageUri: member.profileImageUri }),
         }));
       }
     }
