@@ -70,14 +70,23 @@ export async function createGroup(
       createdAt: new Date(),
     };
 
-    // Convert dates to Firestore Timestamps
+    // Convert dates to Firestore Timestamps and filter out undefined values
     const firestoreData = {
       name: groupData.name,
       code: groupData.code,
-      members: groupData.members.map((member) => ({
-        ...member,
-        joinedAt: Timestamp.fromDate(member.joinedAt),
-      })),
+      members: groupData.members.map((member) => {
+        const memberData: any = {
+          userId: member.userId,
+          name: member.name,
+          partySize: member.partySize,
+          joinedAt: Timestamp.fromDate(member.joinedAt),
+        };
+        // Only include profileImageUri if it's defined
+        if (member.profileImageUri) {
+          memberData.profileImageUri = member.profileImageUri;
+        }
+        return memberData;
+      }),
       memberIds: groupData.memberIds,
       createdAt: Timestamp.fromDate(groupData.createdAt),
     };
@@ -157,10 +166,19 @@ export async function joinGroup(
 
     // Add member to group
     const groupRef = doc(db, GROUPS_COLLECTION, group.id);
-    const memberData = {
-      ...member,
+
+    // Build member data, filtering out undefined values
+    const memberData: any = {
+      userId: member.userId,
+      name: member.name,
+      partySize: member.partySize,
       joinedAt: Timestamp.fromDate(member.joinedAt),
     };
+
+    // Only include profileImageUri if it's defined
+    if (member.profileImageUri) {
+      memberData.profileImageUri = member.profileImageUri;
+    }
 
     await updateDoc(groupRef, {
       members: arrayUnion(memberData),
@@ -241,11 +259,20 @@ export async function updateMemberInfo(
       return member;
     });
 
-    // Convert dates for Firestore
-    const firestoreMembers = updatedMembers.map((member) => ({
-      ...member,
-      joinedAt: Timestamp.fromDate(member.joinedAt),
-    }));
+    // Convert dates for Firestore and filter out undefined values
+    const firestoreMembers = updatedMembers.map((member) => {
+      const memberData: any = {
+        userId: member.userId,
+        name: member.name,
+        partySize: member.partySize,
+        joinedAt: Timestamp.fromDate(member.joinedAt),
+      };
+      // Only include profileImageUri if it's defined
+      if (member.profileImageUri) {
+        memberData.profileImageUri = member.profileImageUri;
+      }
+      return memberData;
+    });
 
     const groupRef = doc(db, GROUPS_COLLECTION, groupId);
     await updateDoc(groupRef, {
@@ -307,11 +334,20 @@ export async function removeMemberFromGroup(
     // Get the updated memberIds array
     const updatedMemberIds = updatedMembers.map((member) => member.userId);
 
-    // Convert dates for Firestore
-    const firestoreMembers = updatedMembers.map((member) => ({
-      ...member,
-      joinedAt: Timestamp.fromDate(member.joinedAt),
-    }));
+    // Convert dates for Firestore and filter out undefined values
+    const firestoreMembers = updatedMembers.map((member) => {
+      const memberData: any = {
+        userId: member.userId,
+        name: member.name,
+        partySize: member.partySize,
+        joinedAt: Timestamp.fromDate(member.joinedAt),
+      };
+      // Only include profileImageUri if it's defined
+      if (member.profileImageUri) {
+        memberData.profileImageUri = member.profileImageUri;
+      }
+      return memberData;
+    });
 
     const groupRef = doc(db, GROUPS_COLLECTION, groupId);
     await updateDoc(groupRef, {
