@@ -5,9 +5,6 @@ import {
   Card,
   Button,
   IconButton,
-  Dialog,
-  Portal,
-  TextInput,
   Chip,
   Menu,
 } from 'react-native-paper';
@@ -40,30 +37,7 @@ export default function ProfileScreen() {
     []
   );
   const [loading, setLoading] = useState(true);
-  const [dialogVisible, setDialogVisible] = useState(false);
-  const [dialogMode, setDialogMode] = useState<'create' | 'join'>('create');
-  const [groupName, setGroupName] = useState('');
-  const [groupCode, setGroupCode] = useState('');
-  const [processing, setProcessing] = useState(false);
-  const [error, setError] = useState('');
   const [menuVisible, setMenuVisible] = useState(false);
-
-  // Profile editing state
-  const [editNameVisible, setEditNameVisible] = useState(false);
-  const [editPartySizeVisible, setEditPartySizeVisible] = useState(false);
-  const [newName, setNewName] = useState('');
-  const [newAdults, setNewAdults] = useState(1);
-  const [newChildren, setNewChildren] = useState(0);
-
-  // Account linking state
-  const [linkAccountVisible, setLinkAccountVisible] = useState(false);
-  const [linkEmail, setLinkEmail] = useState('');
-  const [linkPassword, setLinkPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-
-  // Delete account state
-  const [deleteAccountVisible, setDeleteAccountVisible] = useState(false);
-  const [deleteConfirmText, setDeleteConfirmText] = useState('');
 
   useEffect(() => {
     loadGroups();
@@ -123,116 +97,72 @@ export default function ProfileScreen() {
     }
   };
 
-  const handleCreateGroup = async () => {
-    if (groupName.trim().length < 2) {
-      setError('Please enter a group name (at least 2 characters)');
-      return;
-    }
+  const [processing, setProcessing] = useState(false);
 
-    if (!userProfile) return;
-
-    setProcessing(true);
-    setError('');
-
-    try {
-      // Get current user ID
-      const userId = getCurrentUserId();
-      if (!userId) {
-        throw new Error('User not authenticated. Please restart the app.');
-      }
-
-      // Create group member object from user profile (only include profileImageUri if it exists)
-      const memberData = {
-        userId,
-        name: userProfile.name,
-        ...(userProfile.profileImageUri && { profileImageUri: userProfile.profileImageUri }),
-        partySize: userProfile.partySize,
-        joinedAt: new Date(),
-      };
-
-      const { group, code } = await createGroup(groupName.trim(), memberData);
-
-      await addGroup({
-        groupId: group.id,
-        groupName: group.name,
-        code: code,
-        joinedAt: new Date(),
-      });
-
-      setDialogVisible(false);
-      setGroupName('');
-      loadGroups();
-
-      // Show success message with code
-      Alert.alert(
-        'Group Created!',
-        `Your group code is: ${code}\n\nShare this code with others to invite them to your group.`,
-        [
-          {
-            text: 'Share Code',
-            onPress: () => shareGroupCode(group.name, code),
-          },
-          { text: 'OK' },
-        ]
-      );
-    } catch (err) {
-      console.error('Error creating group:', err);
-      setError('Failed to create group. Please try again.');
-    } finally {
-      setProcessing(false);
-    }
+  const openDialog = (mode: 'create' | 'join') => {
+    navigation.navigate('CreateJoinGroup', { mode });
   };
 
-  const handleJoinGroup = async () => {
-    if (groupCode.trim().length !== 6) {
-      setError('Please enter a valid 6-character group code');
+  const handleEditName = () => {
+    if (!userProfile) return;
+    navigation.navigate('EditName', { currentName: userProfile.name });
+  };
+
+  const handleEditPartySize = () => {
+    if (!userProfile || !currentGroupId) return;
+    const currentGroup = userProfile.joinedGroups.find(g => g.groupId === currentGroupId);
+    if (!currentGroup) return;
+
+    navigation.navigate('EditPartySize', {
+      currentAdults: currentGroup.partySize?.adults || userProfile.partySize.adults,
+      currentChildren: currentGroup.partySize?.children || userProfile.partySize.children,
+    });
+  };
+
+  const handleChangePhoto = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Required', 'Please allow access to your photo library to change your profile photo.');
       return;
     }
 
-    if (!userProfile) return;
-
-    setProcessing(true);
-    setError('');
-
     try {
-      // Get current user ID
-      const userId = getCurrentUserId();
-      if (!userId) {
-        throw new Error('User not authenticated. Please restart the app.');
-      }
-
-      // Create group member object from user profile (only include profileImageUri if it exists)
-      const memberData = {
-        userId,
-        name: userProfile.name,
-        ...(userProfile.profileImageUri && { profileImageUri: userProfile.profileImageUri }),
-        partySize: userProfile.partySize,
-        joinedAt: new Date(),
-      };
-
-      const group = await joinGroup(groupCode.trim().toUpperCase(), memberData);
-
-      await addGroup({
-        groupId: group.id,
-        groupName: group.name,
-        code: group.code,
-        joinedAt: new Date(),
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
       });
 
-      setDialogVisible(false);
-      setGroupCode('');
-      loadGroups();
+      if (!result.canceled && result.assets[0]) {
+        const imageUri = result.assets[0].uri;
+        const userId = getCurrentUserId();
+        if (!userId) {
+          Alert.alert('Error', 'User not authenticated');
+          return;
+        }
 
-      Alert.alert('Success!', `You've joined ${group.name}`);
-    } catch (err) {
-      console.error('Error joining group:', err);
-      if (err instanceof Error && err.message === 'Group not found') {
-        setError('Group not found. Please check the code and try again.');
-      } else {
-        setError('Failed to join group. Please try again.');
+        setLoading(true);
+        const downloadUrl = await uploadProfileImage(userId, imageUri);
+
+        // Update profile in all groups
+        if (userProfile) {
+          await Promise.all(
+            userProfile.joinedGroups.map((group) =>
+              updateMemberInfo(group.groupId, userProfile.name, {
+                profileImageUri: downloadUrl,
+              })
+            )
+          );
+
+          updateProfileInfo({ profileImageUri: downloadUrl });
+        }
+        setLoading(false);
       }
-    } finally {
-      setProcessing(false);
+    } catch (error) {
+      setLoading(false);
+      console.error('Error uploading photo:', error);
+      Alert.alert('Error', 'Failed to pick image. Please try again.');
     }
   };
 
@@ -240,48 +170,43 @@ export default function ProfileScreen() {
     try {
       await Share.share({
         message: `Join my "${groupName}" group on LifeGroup Food!\n\nUse code: ${code}`,
-        title: 'Join My Group',
       });
     } catch (error) {
       console.error('Error sharing:', error);
     }
   };
 
-  const handleRemoveGroup = (group: GroupMembership) => {
+  const handleRemoveGroup = async (groupId: string, groupName: string) => {
     Alert.alert(
       'Leave Group',
-      `Are you sure you want to leave "${group.groupName}"?`,
+      `Are you sure you want to leave "${groupName}"?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Leave',
           style: 'destructive',
           onPress: async () => {
-            await removeGroup(group.groupId);
-            loadGroups();
-          },
-        },
-      ]
-    );
-  };
-
-  const handleClearData = () => {
-    Alert.alert(
-      'Clear All Data',
-      'This will clear your profile and all local data. You will need to go through onboarding again.\n\nNote: This only clears LOCAL data. Firebase data will remain.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Clear Data',
-          style: 'destructive',
-          onPress: async () => {
             try {
-              await AsyncStorage.clear();
-              // Force reload by clearing state
-              window.location.reload();
+              setLoading(true);
+              if (userProfile) {
+                await updateMemberInfo(groupId, userProfile.name, {
+                  name: '[Left Group]',
+                  profileImageUri: null,
+                });
+              }
+              await removeGroup(groupId);
+              if (currentGroupId === groupId) {
+                const remainingGroups = userProfile?.joinedGroups.filter(g => g.groupId !== groupId);
+                if (remainingGroups && remainingGroups.length > 0) {
+                  setCurrentGroup(remainingGroups[0].groupId);
+                }
+              }
+              loadGroups();
+              setLoading(false);
             } catch (error) {
-              console.error('Error clearing data:', error);
-              Alert.alert('Error', 'Failed to clear data');
+              setLoading(false);
+              console.error('Error leaving group:', error);
+              Alert.alert('Error', 'Failed to leave group. Please try again.');
             }
           },
         },
@@ -289,199 +214,26 @@ export default function ProfileScreen() {
     );
   };
 
-  const openDialog = (mode: 'create' | 'join') => {
-    setDialogMode(mode);
-    setError('');
-    setGroupName('');
-    setGroupCode('');
-    setDialogVisible(true);
+  const handleNotificationPreferencesChange = (preferences: NotificationPreferences) => {
+    updateProfileInfo({ notificationPreferences: preferences });
   };
 
-  // Profile editing handlers
-  const handleEditName = () => {
-    if (!userProfile) return;
-    setNewName(userProfile.name);
-    setEditNameVisible(true);
-  };
-
-  const handleSaveName = async () => {
-    if (newName.trim().length < 2) {
-      setError('Please enter a name (at least 2 characters)');
-      return;
-    }
-
-    setProcessing(true);
-    setError('');
-
-    try {
-      await updateProfileInfo({ name: newName.trim() });
-      setEditNameVisible(false);
-      Alert.alert('Success', 'Your name has been updated');
-    } catch (err) {
-      console.error('Error updating name:', err);
-      setError('Failed to update name. Please try again.');
-    } finally {
-      setProcessing(false);
-    }
-  };
-
-  const handleChangePhoto = async () => {
-    if (!userProfile) return;
-
-    try {
-      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-      if (!permissionResult.granted) {
-        Alert.alert('Permission required', 'Please allow access to your photos to change your profile image.');
-        return;
-      }
-
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.7,
-      });
-
-      if (!result.canceled && result.assets[0]) {
-        setProcessing(true);
-
-        try {
-          const userId = `${userProfile.name}_${Date.now()}`;
-          const uploadedImageUri = await uploadProfileImage(userId, result.assets[0].uri);
-
-          // Update local profile
-          await updateProfileInfo({ profileImageUri: uploadedImageUri });
-
-          // Sync to all groups in Firestore
-          if (userProfile?.joinedGroups) {
-            await Promise.allSettled(
-              userProfile.joinedGroups.map((group) =>
-                updateMemberInfo(group.groupId, userProfile.name, { profileImageUri: uploadedImageUri })
-              )
-            );
-          }
-
-          Alert.alert('Success', 'Your profile photo has been updated');
-        } catch (uploadError) {
-          console.error('Failed to upload profile image:', uploadError);
-          Alert.alert('Error', 'Failed to update profile photo. Please try again.');
-        } finally {
-          setProcessing(false);
-        }
-      }
-    } catch (error) {
-      console.error('Error picking image:', error);
-      Alert.alert('Error', 'Failed to pick image. Please try again.');
-    }
-  };
-
-  const handleEditPartySize = () => {
-    if (!userProfile) return;
-    setNewAdults(userProfile.partySize.adults);
-    setNewChildren(userProfile.partySize.children);
-    setEditPartySizeVisible(true);
-  };
-
-  const handleSavePartySize = async () => {
-    if (newAdults < 1) {
-      setError('You must have at least 1 adult');
-      return;
-    }
-
-    setProcessing(true);
-    setError('');
-
-    try {
-      const newPartySize = { adults: newAdults, children: newChildren };
-
-      // Update local profile
-      await updateProfileInfo({ partySize: newPartySize });
-
-      // Sync to all groups in Firestore
-      if (userProfile?.joinedGroups) {
-        await Promise.allSettled(
-          userProfile.joinedGroups.map((group) =>
-            updateMemberInfo(group.groupId, userProfile.name, { partySize: newPartySize })
-          )
-        );
-      }
-
-      setEditPartySizeVisible(false);
-      Alert.alert('Success', 'Your party size has been updated');
-    } catch (err) {
-      console.error('Error updating party size:', err);
-      setError('Failed to update party size. Please try again.');
-    } finally {
-      setProcessing(false);
-    }
-  };
-
-  const handleNotificationPreferencesChange = async (newPreferences: NotificationPreferences) => {
-    try {
-      // Request permissions if enabling notifications
-      if (newPreferences.enabled && !userProfile?.notificationPreferences?.enabled) {
-        const hasPermission = await requestNotificationPermissions();
-        if (!hasPermission) {
-          Alert.alert(
-            'Permission Required',
-            'Please enable notifications in your device settings to receive meal reminders.',
-            [{ text: 'OK' }]
-          );
-          return;
-        }
-      }
-
-      // Update local profile
-      await updateProfileInfo({ notificationPreferences: newPreferences });
-
-      // TODO: Reschedule all notifications based on new preferences
-      // This will be implemented when we integrate with menuService
-    } catch (err) {
-      console.error('Error updating notification preferences:', err);
-      Alert.alert('Error', 'Failed to update notification preferences. Please try again.');
-    }
-  };
-
-  const handleLinkAccount = async () => {
-    if (!linkEmail.trim() || !linkPassword.trim()) {
-      setError('Please enter both email and password');
-      return;
-    }
-
-    // Basic email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(linkEmail)) {
-      setError('Please enter a valid email address');
-      return;
-    }
-
-    if (linkPassword.length < 6) {
-      setError('Password must be at least 6 characters');
-      return;
-    }
-
-    setProcessing(true);
-    setError('');
-
-    try {
-      await linkWithEmailAndPassword(linkEmail.trim(), linkPassword);
-
-      setLinkAccountVisible(false);
-      setLinkEmail('');
-      setLinkPassword('');
-
-      Alert.alert(
-        'Account Linked!',
-        'Your account is now linked to your email. You can sign in from any device using this email and password.',
-        [{ text: 'Great!' }]
-      );
-    } catch (err) {
-      console.error('Error linking account:', err);
-      setError(err instanceof Error ? err.message : 'Failed to link account. Please try again.');
-    } finally {
-      setProcessing(false);
-    }
+  const handleClearData = () => {
+    Alert.alert(
+      'Clear All Data',
+      'This will remove all local data and reset the app. You will need to create or join groups again. Continue?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Clear Data',
+          style: 'destructive',
+          onPress: async () => {
+            await AsyncStorage.clear();
+            // App will restart automatically
+          },
+        },
+      ]
+    );
   };
 
   const handleExportData = async () => {
@@ -512,40 +264,6 @@ export default function ProfileScreen() {
     }
   };
 
-  const handleDeleteAccount = async () => {
-    if (deleteConfirmText !== 'DELETE') {
-      setError('Please type DELETE to confirm');
-      return;
-    }
-
-    setProcessing(true);
-    setError('');
-
-    try {
-      // Call the Cloud Function to delete all user data
-      const deleteUserAccountFn = httpsCallable(functions, 'deleteUserAccount');
-      const result = await deleteUserAccountFn();
-
-      console.log('Account deletion result:', result.data);
-
-      // Delete Firebase Auth account
-      await deleteAuthAccount();
-
-      // Clear local storage
-      await AsyncStorage.clear();
-
-      // User will be redirected to onboarding automatically
-      Alert.alert(
-        'Account Deleted',
-        'Your account and all associated data have been permanently deleted.',
-        [{ text: 'OK' }]
-      );
-    } catch (err) {
-      console.error('Error deleting account:', err);
-      setError(err instanceof Error ? err.message : 'Failed to delete account. Please contact support.');
-      setProcessing(false);
-    }
-  };
 
   if (loading) {
     return <Loading message="Loading your groups..." />;
@@ -642,9 +360,7 @@ export default function ProfileScreen() {
             <Menu.Item
               onPress={() => {
                 setMenuVisible(false);
-                setDeleteAccountVisible(true);
-                setDeleteConfirmText('');
-                setError('');
+                navigation.navigate('DeleteAccount');
               }}
               title="Delete Account"
               leadingIcon="account-remove"
@@ -727,10 +443,7 @@ export default function ProfileScreen() {
                 </View>
                 <Button
                   mode="contained"
-                  onPress={() => {
-                    setLinkAccountVisible(true);
-                    setError('');
-                  }}
+                  onPress={() => navigation.navigate('LinkAccount')}
                   style={styles.linkAccountButton}
                   icon="link"
                 >
@@ -831,250 +544,6 @@ export default function ProfileScreen() {
         contentContainerStyle={styles.listContent}
         style={styles.container}
       />
-
-      <Portal>
-        <Dialog visible={dialogVisible} onDismiss={() => setDialogVisible(false)}>
-          <Dialog.Title>
-            {dialogMode === 'create' ? 'Create New Group' : 'Join Group'}
-          </Dialog.Title>
-          <Dialog.Content>
-            {dialogMode === 'create' ? (
-              <>
-                <TextInput
-                  mode="outlined"
-                  label="Group Name"
-                  value={groupName}
-                  onChangeText={(text) => {
-                    setGroupName(text);
-                    setError('');
-                  }}
-                  placeholder="e.g., Smith Family"
-                  autoCapitalize="words"
-                  error={!!error}
-                  disabled={processing}
-                />
-                <Text variant="bodySmall" style={styles.dialogHint}>
-                  You'll receive a shareable code to invite others
-                </Text>
-              </>
-            ) : (
-              <>
-                <TextInput
-                  mode="outlined"
-                  label="Group Code"
-                  value={groupCode}
-                  onChangeText={(text) => {
-                    setGroupCode(text.toUpperCase());
-                    setError('');
-                  }}
-                  placeholder="ABC123"
-                  autoCapitalize="characters"
-                  autoCorrect={false}
-                  maxLength={6}
-                  error={!!error}
-                  disabled={processing}
-                />
-                <Text variant="bodySmall" style={styles.dialogHint}>
-                  Enter the 6-character code shared by your group
-                </Text>
-              </>
-            )}
-            {error && <Text style={styles.errorText}>{error}</Text>}
-          </Dialog.Content>
-          <Dialog.Actions>
-            <Button onPress={() => setDialogVisible(false)} disabled={processing}>
-              Cancel
-            </Button>
-            <Button
-              onPress={dialogMode === 'create' ? handleCreateGroup : handleJoinGroup}
-              loading={processing}
-              disabled={processing}
-            >
-              {dialogMode === 'create' ? 'Create' : 'Join'}
-            </Button>
-          </Dialog.Actions>
-        </Dialog>
-
-        {/* Edit Name Dialog */}
-        <Dialog visible={editNameVisible} onDismiss={() => setEditNameVisible(false)}>
-          <Dialog.Title>Edit Your Name</Dialog.Title>
-          <Dialog.Content>
-            <TextInput
-              mode="outlined"
-              label="Your Name"
-              value={newName}
-              onChangeText={(text) => {
-                setNewName(text);
-                setError('');
-              }}
-              autoCapitalize="words"
-              autoCorrect={false}
-              error={!!error}
-              disabled={processing}
-            />
-            {error && <Text style={styles.errorText}>{error}</Text>}
-          </Dialog.Content>
-          <Dialog.Actions>
-            <Button onPress={() => setEditNameVisible(false)} disabled={processing}>
-              Cancel
-            </Button>
-            <Button
-              onPress={handleSaveName}
-              loading={processing}
-              disabled={processing}
-            >
-              Save
-            </Button>
-          </Dialog.Actions>
-        </Dialog>
-
-        {/* Edit Party Size Dialog */}
-        <Dialog visible={editPartySizeVisible} onDismiss={() => setEditPartySizeVisible(false)}>
-          <Dialog.Title>Edit Party Size</Dialog.Title>
-          <Dialog.Content>
-            <PartySizeInput
-              adults={newAdults}
-              children={newChildren}
-              onAdultsChange={setNewAdults}
-              onChildrenChange={setNewChildren}
-            />
-            {error && <Text style={styles.errorText}>{error}</Text>}
-          </Dialog.Content>
-          <Dialog.Actions>
-            <Button onPress={() => setEditPartySizeVisible(false)} disabled={processing}>
-              Cancel
-            </Button>
-            <Button
-              onPress={handleSavePartySize}
-              loading={processing}
-              disabled={processing}
-            >
-              Save
-            </Button>
-          </Dialog.Actions>
-        </Dialog>
-
-        {/* Link Account Dialog */}
-        <Dialog visible={linkAccountVisible} onDismiss={() => setLinkAccountVisible(false)}>
-          <Dialog.Title>Link Your Account</Dialog.Title>
-          <Dialog.Content>
-            <Text variant="bodyMedium" style={styles.linkAccountHint}>
-              Link your account to an email and password so you can access your data from any device.
-            </Text>
-            <TextInput
-              mode="outlined"
-              label="Email"
-              value={linkEmail}
-              onChangeText={(text) => {
-                setLinkEmail(text);
-                setError('');
-              }}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoCorrect={false}
-              error={!!error}
-              disabled={processing}
-              style={styles.linkAccountInput}
-            />
-            <TextInput
-              mode="outlined"
-              label="Password"
-              value={linkPassword}
-              onChangeText={(text) => {
-                setLinkPassword(text);
-                setError('');
-              }}
-              secureTextEntry={!showPassword}
-              right={
-                <TextInput.Icon
-                  icon={showPassword ? 'eye-off' : 'eye'}
-                  onPress={() => setShowPassword(!showPassword)}
-                />
-              }
-              error={!!error}
-              disabled={processing}
-              style={styles.linkAccountInput}
-            />
-            <Text variant="bodySmall" style={styles.linkAccountNote}>
-              Password must be at least 6 characters
-            </Text>
-            {error && <Text style={styles.errorText}>{error}</Text>}
-          </Dialog.Content>
-          <Dialog.Actions>
-            <Button onPress={() => setLinkAccountVisible(false)} disabled={processing}>
-              Cancel
-            </Button>
-            <Button
-              onPress={handleLinkAccount}
-              loading={processing}
-              disabled={processing}
-            >
-              Link Account
-            </Button>
-          </Dialog.Actions>
-        </Dialog>
-
-        {/* Delete Account Dialog */}
-        <Dialog visible={deleteAccountVisible} onDismiss={() => setDeleteAccountVisible(false)}>
-          <Dialog.Title>Delete Account</Dialog.Title>
-          <Dialog.Content>
-            <Text variant="bodyMedium" style={{ color: colors.error, marginBottom: spacing.md }}>
-              ⚠️ WARNING: This action is permanent and cannot be undone!
-            </Text>
-            <Text variant="bodyMedium" style={styles.linkAccountHint}>
-              Deleting your account will:
-            </Text>
-            <View style={{ marginLeft: spacing.md, marginTop: spacing.sm }}>
-              <Text variant="bodySmall" style={styles.linkAccountHint}>
-                • Remove you from all groups
-              </Text>
-              <Text variant="bodySmall" style={styles.linkAccountHint}>
-                • Anonymize your menu proposals
-              </Text>
-              <Text variant="bodySmall" style={styles.linkAccountHint}>
-                • Release all your item reservations
-              </Text>
-              <Text variant="bodySmall" style={styles.linkAccountHint}>
-                • Delete your profile photo
-              </Text>
-              <Text variant="bodySmall" style={styles.linkAccountHint}>
-                • Delete your authentication credentials
-              </Text>
-            </View>
-            <Text variant="bodyMedium" style={{ marginTop: spacing.md, marginBottom: spacing.sm }}>
-              To confirm, type <Text style={{ fontWeight: 'bold' }}>DELETE</Text> below:
-            </Text>
-            <TextInput
-              mode="outlined"
-              value={deleteConfirmText}
-              onChangeText={(text) => {
-                setDeleteConfirmText(text);
-                setError('');
-              }}
-              placeholder="Type DELETE"
-              autoCapitalize="characters"
-              error={!!error}
-              disabled={processing}
-              style={styles.linkAccountInput}
-            />
-            {error && <Text style={styles.errorText}>{error}</Text>}
-          </Dialog.Content>
-          <Dialog.Actions>
-            <Button onPress={() => setDeleteAccountVisible(false)} disabled={processing}>
-              Cancel
-            </Button>
-            <Button
-              onPress={handleDeleteAccount}
-              loading={processing}
-              disabled={processing}
-              buttonColor={colors.error}
-              textColor={colors.text.onPrimary}
-            >
-              Delete Forever
-            </Button>
-          </Dialog.Actions>
-        </Dialog>
-      </Portal>
     </Screen>
   );
 }

@@ -125,6 +125,11 @@ export type RootStackParamList = {
   AddEditItem: { menuId: string; itemId?: string };
   ItemDetails: { item: MenuItem };
   GroupDetails: { groupId: string };
+  EditName: { currentName: string };
+  EditPartySize: { currentAdults: number; currentChildren: number };
+  LinkAccount: undefined;
+  DeleteAccount: undefined;
+  CreateJoinGroup: { mode: 'create' | 'join' };
 };
 
 export type MainTabParamList = {
