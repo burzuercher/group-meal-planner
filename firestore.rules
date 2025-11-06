@@ -13,6 +13,15 @@ service cloud.firestore {
              request.auth.uid in get(/databases/$(database)/documents/groups/$(groupId)).data.memberIds;
     }
 
+    // Helper function: Check if user is joining the group
+    function isJoiningGroup(groupId) {
+      return isAuthenticated() &&
+             // User is NOT currently a member
+             !(request.auth.uid in resource.data.memberIds) &&
+             // User IS being added to memberIds in this update
+             (request.auth.uid in request.resource.data.memberIds);
+    }
+
     // Groups collection
     match /groups/{groupId} {
       // Anyone authenticated can create a group (they become the first member)
@@ -23,8 +32,9 @@ service cloud.firestore {
       // Also allow reading for code validation (when creating/joining groups)
       allow read: if isAuthenticated();
 
-      // Members can update group (for joining, editing name, etc.)
-      allow update: if isMemberOfGroup(groupId);
+      // Members can update group (for editing name, etc.)
+      // OR users can update to join the group (add themselves to memberIds)
+      allow update: if isMemberOfGroup(groupId) || isJoiningGroup(groupId);
 
       // No one can delete groups (prevent accidental deletion)
       // If you want to allow deletion, add a Cloud Function for it
