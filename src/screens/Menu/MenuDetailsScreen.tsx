@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, StyleSheet, ScrollView, Alert, RefreshControl, Platform, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, ScrollView, Alert, RefreshControl, Platform, TouchableOpacity, SectionList } from 'react-native';
 import { Text, FAB, Chip, IconButton, Menu, Divider, Button, Dialog, Portal, TextInput } from 'react-native-paper';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -20,7 +20,7 @@ import {
   getMenuByDate,
 } from '../../services/menuService';
 import { getGroupById } from '../../services/groupService';
-import { Menu as MenuType, MenuItem, RootStackParamList, MenuAttendee, GroupMember } from '../../types';
+import { Menu as MenuType, MenuItem, RootStackParamList, MenuAttendee, GroupMember, MenuItemCategory } from '../../types';
 import { formatDate, parseDateKey, formatDateKey } from '../../utils/dateUtils';
 
 type MenuDetailsRouteProp = RouteProp<RootStackParamList, 'MenuDetails'>;
@@ -38,6 +38,11 @@ export default function MenuDetailsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [menuVisible, setMenuVisible] = useState(false);
   const [filter, setFilter] = useState<'all' | 'available' | 'mine'>('all');
+  const [selectedCategories, setSelectedCategories] = useState<Set<MenuItemCategory>>(
+    new Set(['Main Dish', 'Side Dish', 'Appetizer', 'Dessert', 'Beverage', 'Other'] as MenuItemCategory[])
+  );
+  const [collapsedSections, setCollapsedSections] = useState<Set<MenuItemCategory>>(new Set());
+  const [categoryFiltersCollapsed, setCategoryFiltersCollapsed] = useState(true);
 
   // Edit menu dialog state
   const [editDialogVisible, setEditDialogVisible] = useState(false);
@@ -48,6 +53,7 @@ export default function MenuDetailsScreen() {
   // Attendance editor state
   const [showAttendanceEditor, setShowAttendanceEditor] = useState(false);
   const [savingAttendance, setSavingAttendance] = useState(false);
+  const [attendanceSectionCollapsed, setAttendanceSectionCollapsed] = useState(true);
 
   // Image lightbox state
   const [showImageLightbox, setShowImageLightbox] = useState(false);
@@ -314,15 +320,141 @@ export default function MenuDetailsScreen() {
     }
   };
 
+  // Category order constant
+  const CATEGORY_ORDER: MenuItemCategory[] = [
+    'Main Dish',
+    'Side Dish',
+    'Appetizer',
+    'Dessert',
+    'Beverage',
+    'Other',
+  ];
+
   const getFilteredItems = () => {
+    // First filter by reservation status
+    let filtered = items;
     switch (filter) {
       case 'available':
-        return items.filter((item) => !item.reservedBy);
+        filtered = items.filter((item) => !item.reservedBy);
+        break;
       case 'mine':
-        return items.filter((item) => item.reservedBy === userProfile?.name);
+        filtered = items.filter((item) => item.reservedBy === userProfile?.name);
+        break;
       default:
-        return items;
+        filtered = items;
     }
+
+    // Then filter by selected categories
+    filtered = filtered.filter((item) => selectedCategories.has(item.category));
+    return filtered;
+  };
+
+  // Transform filtered items into sections for SectionList
+  const getSections = () => {
+    const filteredItems = getFilteredItems();
+    const sections: { title: MenuItemCategory; data: MenuItem[] }[] = [];
+
+    // Create a map of category to items
+    const categoryMap = new Map<MenuItemCategory, MenuItem[]>();
+    CATEGORY_ORDER.forEach((cat) => categoryMap.set(cat, []));
+
+    // Group items by category
+    filteredItems.forEach((item) => {
+      const items = categoryMap.get(item.category) || [];
+      categoryMap.set(item.category, [...items, item]);
+    });
+
+    // Create sections array in category order, only for selected categories with items
+    CATEGORY_ORDER.forEach((category) => {
+      const categoryItems = categoryMap.get(category) || [];
+      if (selectedCategories.has(category) && categoryItems.length > 0) {
+        // If section is collapsed, return empty data (but section header will still render)
+        sections.push({
+          title: category,
+          data: collapsedSections.has(category) ? [] : categoryItems,
+        });
+      }
+    });
+
+    return sections;
+  };
+
+  const toggleCategory = (category: MenuItemCategory) => {
+    const newSelected = new Set(selectedCategories);
+    if (newSelected.has(category)) {
+      newSelected.delete(category);
+    } else {
+      newSelected.add(category);
+    }
+    setSelectedCategories(newSelected);
+  };
+
+  const toggleAllCategories = () => {
+    if (selectedCategories.size === CATEGORY_ORDER.length) {
+      // If all are selected, deselect all
+      setSelectedCategories(new Set());
+    } else {
+      // Otherwise select all
+      setSelectedCategories(new Set(CATEGORY_ORDER));
+    }
+  };
+
+  const toggleSectionCollapsed = (category: MenuItemCategory) => {
+    const newCollapsed = new Set(collapsedSections);
+    if (newCollapsed.has(category)) {
+      newCollapsed.delete(category);
+    } else {
+      newCollapsed.add(category);
+    }
+    setCollapsedSections(newCollapsed);
+  };
+
+  // Get item count for a category (for display, not affected by collapse state)
+  const getCategoryItemCount = (category: MenuItemCategory): number => {
+    const filteredItems = getFilteredItems();
+    return filteredItems.filter((item) => item.category === category).length;
+  };
+
+  // Group attendees by age category
+  interface AttendeeWithAge {
+    name: string;
+    count: number;
+    profileImageUri?: string;
+    isCurrentUser: boolean;
+  }
+
+  const getAdultsAttendees = (): AttendeeWithAge[] => {
+    if (!menu || !menu.attendees) return [];
+    return menu.attendees
+      .filter((attendee) => attendee.adults > 0)
+      .map((attendee) => ({
+        name: attendee.name === userProfile?.name ? 'You' : attendee.name,
+        count: attendee.adults,
+        profileImageUri: attendee.profileImageUri,
+        isCurrentUser: attendee.name === userProfile?.name,
+      }));
+  };
+
+  const getChildrenAttendees = (): AttendeeWithAge[] => {
+    if (!menu || !menu.attendees) return [];
+    return menu.attendees
+      .filter((attendee) => attendee.children > 0)
+      .map((attendee) => ({
+        name: attendee.name === userProfile?.name ? 'You' : attendee.name,
+        count: attendee.children,
+        profileImageUri: attendee.profileImageUri,
+        isCurrentUser: attendee.name === userProfile?.name,
+      }));
+  };
+
+  const getTotalAdults = (): number => {
+    if (!menu || !menu.attendees) return 0;
+    return menu.attendees.reduce((sum, a) => sum + a.adults, 0);
+  };
+
+  const getTotalChildren = (): number => {
+    if (!menu || !menu.attendees) return 0;
+    return menu.attendees.reduce((sum, a) => sum + a.children, 0);
   };
 
   const getProfileImageByName = (name: string | null): string | undefined => {
@@ -456,15 +588,24 @@ export default function MenuDetailsScreen() {
         {/* Attendance Section - Only show for active menus */}
         {menu.status === 'active' && (
           <View style={styles.attendanceSection}>
-            <View style={styles.attendanceHeader}>
-              <View style={styles.attendanceInfo}>
+            {/* Collapsible Attendance Header */}
+            <TouchableOpacity
+              style={styles.attendanceHeaderCollapsible}
+              onPress={() => setAttendanceSectionCollapsed(!attendanceSectionCollapsed)}
+            >
+              <View style={styles.attendanceHeaderLeft}>
+                <MaterialCommunityIcons
+                  name={attendanceSectionCollapsed ? 'chevron-right' : 'chevron-down'}
+                  size={24}
+                  color={colors.text.primary}
+                />
                 <MaterialCommunityIcons
                   name="account-group"
                   size={20}
                   color={colors.primary}
                 />
                 <Text variant="titleSmall" style={styles.attendanceTitle}>
-                  Attendance: {menu.attendees.reduce((sum, a) => sum + a.adults, 0)} adults, {menu.attendees.reduce((sum, a) => sum + a.children, 0)} children ({menu.attendees.reduce((sum, a) => sum + a.adults + a.children, 0)} total)
+                  Attendance ({getTotalAdults() + getTotalChildren()})
                 </Text>
               </View>
               <Button
@@ -486,77 +627,178 @@ export default function MenuDetailsScreen() {
                   ? 'Attending'
                   : 'Not Attending'}
               </Button>
-            </View>
+            </TouchableOpacity>
 
-            {showAttendanceEditor && userProfile && (
-              <View style={styles.attendanceEditorContainer}>
-                <AttendanceEditor
-                  defaultPartySize={userProfile.partySize}
-                  currentAttendance={menu.attendees.find(a => a.name === userProfile.name)}
-                  onSave={handleSaveAttendance}
-                  onCancel={() => setShowAttendanceEditor(false)}
-                  loading={savingAttendance}
-                />
-              </View>
-            )}
-
-            {menu.attendees.length > 0 && (
-              <View style={styles.attendeesList}>
-                {menu.attendees.map((attendee, index) => (
-                  <View key={index} style={styles.attendeeChipContainer}>
-                    <Avatar
-                      imageUri={attendee.profileImageUri}
-                      name={attendee.name}
-                      size={32}
-                      style={styles.attendeeAvatar}
+            {!attendanceSectionCollapsed && (
+              <>
+                {showAttendanceEditor && userProfile && (
+                  <View style={styles.attendanceEditorContainer}>
+                    <AttendanceEditor
+                      defaultPartySize={userProfile.partySize}
+                      currentAttendance={menu.attendees.find(a => a.name === userProfile.name)}
+                      onSave={handleSaveAttendance}
+                      onCancel={() => setShowAttendanceEditor(false)}
+                      loading={savingAttendance}
                     />
-                    <Chip
-                      style={[
-                        styles.attendeeChip,
-                        attendee.name === userProfile?.name && styles.myAttendeeChip,
-                      ]}
-                      textStyle={styles.attendeeChipText}
-                      compact
-                    >
-                      {attendee.name === userProfile?.name ? 'You' : attendee.name} ({[
-                        attendee.adults > 0 ? `${attendee.adults}A` : null,
-                        attendee.children > 0 ? `${attendee.children}C` : null,
-                      ].filter(Boolean).join(', ')})
-                    </Chip>
                   </View>
-                ))}
-              </View>
+                )}
+
+                {menu.attendees.length > 0 && (
+                  <>
+                    {/* Adults Section */}
+                    {getAdultsAttendees().length > 0 && (
+                      <View style={styles.ageGroupSection}>
+                        <Text variant="labelMedium" style={styles.ageGroupLabel}>
+                          Adults ({getTotalAdults()})
+                        </Text>
+                        <View style={styles.attendeesList}>
+                          {getAdultsAttendees().map((attendee, index) => (
+                            <View key={`adult-${index}`} style={styles.attendeeChipContainer}>
+                              <Avatar
+                                imageUri={attendee.profileImageUri}
+                                name={attendee.name}
+                                size={32}
+                                style={styles.attendeeAvatar}
+                              />
+                              <Chip
+                                style={[
+                                  styles.attendeeChip,
+                                  attendee.isCurrentUser && styles.myAttendeeChip,
+                                ]}
+                                textStyle={styles.attendeeChipText}
+                                compact
+                              >
+                                {attendee.name} ({attendee.count})
+                              </Chip>
+                            </View>
+                          ))}
+                        </View>
+                      </View>
+                    )}
+
+                    {/* Children Section */}
+                    {getChildrenAttendees().length > 0 && (
+                      <View style={styles.ageGroupSection}>
+                        <Text variant="labelMedium" style={styles.ageGroupLabel}>
+                          Children ({getTotalChildren()})
+                        </Text>
+                        <View style={styles.attendeesList}>
+                          {getChildrenAttendees().map((attendee, index) => (
+                            <View key={`child-${index}`} style={styles.attendeeChipContainer}>
+                              <Avatar
+                                imageUri={attendee.profileImageUri}
+                                name={attendee.name}
+                                size={32}
+                                style={styles.attendeeAvatar}
+                              />
+                              <Chip
+                                style={[
+                                  styles.attendeeChip,
+                                  attendee.isCurrentUser && styles.myAttendeeChip,
+                                ]}
+                                textStyle={styles.attendeeChipText}
+                                compact
+                              >
+                                {attendee.name} ({attendee.count})
+                              </Chip>
+                            </View>
+                          ))}
+                        </View>
+                      </View>
+                    )}
+                  </>
+                )}
+              </>
             )}
           </View>
         )}
 
-        {/* Filters */}
-        <View style={styles.filters}>
-          <Chip
-            selected={filter === 'all'}
-            onPress={() => setFilter('all')}
-            style={styles.filterChip}
-          >
-            All ({items.length})
-          </Chip>
-          <Chip
-            selected={filter === 'available'}
-            onPress={() => setFilter('available')}
-            style={styles.filterChip}
-          >
-            Available ({availableCount})
-          </Chip>
-          <Chip
-            selected={filter === 'mine'}
-            onPress={() => setFilter('mine')}
-            style={styles.filterChip}
-          >
-            Mine ({myCount})
-          </Chip>
+        {/* Item List Header */}
+        <View style={styles.itemListHeader}>
+          <MaterialCommunityIcons
+            name="format-list-bulleted"
+            size={20}
+            color={colors.text.onPrimary}
+          />
+          <Text variant="titleSmall" style={styles.itemListHeaderText}>
+            Item List
+          </Text>
+        </View>
+
+        {/* Filters - Reservation Status */}
+        <View style={styles.filterSection}>
+          <View style={styles.filters}>
+            <Chip
+              selected={filter === 'all'}
+              onPress={() => setFilter('all')}
+              style={styles.filterChip}
+            >
+              All ({items.length})
+            </Chip>
+            <Chip
+              selected={filter === 'available'}
+              onPress={() => setFilter('available')}
+              style={styles.filterChip}
+            >
+              Available ({availableCount})
+            </Chip>
+            <Chip
+              selected={filter === 'mine'}
+              onPress={() => setFilter('mine')}
+              style={styles.filterChip}
+            >
+              Mine ({myCount})
+            </Chip>
+          </View>
+
+          {/* Category Filters - Collapsible */}
+          <View style={styles.categoryFiltersOuterContainer}>
+            <TouchableOpacity
+              style={styles.categoryFiltersHeader}
+              onPress={() => setCategoryFiltersCollapsed(!categoryFiltersCollapsed)}
+            >
+              <View style={styles.categoryFiltersHeaderLeft}>
+                <MaterialCommunityIcons
+                  name={categoryFiltersCollapsed ? 'chevron-right' : 'chevron-down'}
+                  size={24}
+                  color={colors.text.primary}
+                />
+                <Text variant="labelMedium" style={styles.categoryFilterLabel}>
+                  Categories ({selectedCategories.size})
+                </Text>
+              </View>
+            </TouchableOpacity>
+
+            {!categoryFiltersCollapsed && (
+              <View style={styles.categoryFiltersContainer}>
+                <View style={styles.categoryFilters}>
+                  <Chip
+                    selected={selectedCategories.size === CATEGORY_ORDER.length}
+                    onPress={toggleAllCategories}
+                    style={styles.filterChip}
+                    compact
+                  >
+                    All Categories
+                  </Chip>
+                  {CATEGORY_ORDER.map((category) => (
+                    <Chip
+                      key={category}
+                      selected={selectedCategories.has(category)}
+                      onPress={() => toggleCategory(category)}
+                      style={styles.filterChip}
+                      compact
+                    >
+                      {category}
+                    </Chip>
+                  ))}
+                </View>
+              </View>
+            )}
+          </View>
         </View>
 
         {/* Items List */}
-        {filteredItems.length === 0 ? (
+        {getSections().length === 0 ? (
           <EmptyState
             icon="food-off"
             title={
@@ -575,17 +817,51 @@ export default function MenuDetailsScreen() {
             }
           />
         ) : (
-          <View style={styles.list}>
-            {filteredItems.map((item) => (
-              <MenuItemCard
-                key={item.id}
-                item={item}
-                reservedByProfileImage={getProfileImageByName(item.reservedBy)}
-                onReserve={() => handleToggleReservation(item)}
-                onDelete={() => handleDeleteItem(item)}
-              />
-            ))}
-          </View>
+          <SectionList
+            sections={getSections()}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item, index, section }) => (
+              <View style={[
+                styles.itemContainer,
+                index === 0 && styles.firstItemContainer,
+                index === section.data.length - 1 && styles.lastItemContainer,
+              ]}>
+                <MenuItemCard
+                  item={item}
+                  reservedByProfileImage={getProfileImageByName(item.reservedBy)}
+                  onReserve={() => handleToggleReservation(item)}
+                  onDelete={() => handleDeleteItem(item)}
+                />
+              </View>
+            )}
+            renderSectionHeader={({ section: { title } }) => (
+              <TouchableOpacity
+                style={styles.sectionHeader}
+                onPress={() => toggleSectionCollapsed(title)}
+              >
+                <View style={styles.sectionHeaderContent}>
+                  <MaterialCommunityIcons
+                    name={collapsedSections.has(title) ? 'chevron-right' : 'chevron-down'}
+                    size={24}
+                    color={colors.text.primary}
+                  />
+                  <Text variant="titleSmall" style={styles.sectionTitle}>
+                    {title}
+                  </Text>
+                  <Chip
+                    style={styles.sectionItemCount}
+                    compact
+                    size="small"
+                  >
+                    {getCategoryItemCount(title)}
+                  </Chip>
+                </View>
+              </TouchableOpacity>
+            )}
+            renderSectionFooter={() => <View style={styles.sectionFooter} />}
+            stickySectionHeadersEnabled={false}
+            scrollEnabled={false}
+          />
         )}
       </ScrollView>
 
@@ -733,18 +1009,20 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   attendanceSection: {
-    padding: spacing.md,
     backgroundColor: colors.surface,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  attendanceHeader: {
+  attendanceHeaderCollapsible: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
-  attendanceInfo: {
+  attendanceHeaderLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
@@ -759,13 +1037,26 @@ const styles = StyleSheet.create({
     marginLeft: spacing.sm,
   },
   attendanceEditorContainer: {
-    marginTop: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  ageGroupSection: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  ageGroupLabel: {
+    color: colors.text.secondary,
+    fontWeight: '600',
+    marginBottom: spacing.sm,
   },
   attendeesList: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.sm,
-    marginTop: spacing.md,
   },
   attendeeChipContainer: {
     flexDirection: 'row',
@@ -784,13 +1075,96 @@ const styles = StyleSheet.create({
   attendeeChipText: {
     fontSize: 12,
   },
+  filterSection: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    backgroundColor: colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
   filters: {
     flexDirection: 'row',
     gap: spacing.sm,
-    padding: spacing.md,
-    backgroundColor: colors.surface,
+    marginBottom: spacing.md,
+    flexWrap: 'wrap',
   },
   filterChip: {},
+  itemListHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    backgroundColor: colors.primary,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  itemListHeaderText: {
+    fontWeight: '700',
+    color: colors.text.onPrimary,
+  },
+  categoryFiltersOuterContainer: {
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  categoryFiltersHeader: {
+    paddingVertical: spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  categoryFiltersHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  categoryFiltersContainer: {
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  categoryFilterLabel: {
+    color: colors.text.secondary,
+    fontWeight: '600',
+  },
+  categoryFilters: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    flexWrap: 'wrap',
+  },
+  sectionHeader: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.text.disabled,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  sectionHeaderContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  sectionTitle: {
+    flex: 1,
+    fontWeight: '600',
+    color: colors.text.primary,
+  },
+  sectionItemCount: {
+    minWidth: 0,
+  },
+  sectionFooter: {
+    height: 0,
+  },
+  itemContainer: {
+    paddingVertical: 0,
+  },
+  firstItemContainer: {
+    paddingTop: spacing.md,
+  },
+  lastItemContainer: {
+    paddingBottom: spacing.md,
+  },
   list: {
     paddingBottom: spacing.xxl,
   },
